@@ -6,7 +6,6 @@ import { MLPrediction, HistoricalDataPoint, VehicleCountEntry } from '@/types/tr
 
 /**
  * TREND ANALYSIS: Simple linear regression on recent vehicle counts.
- * Determines if traffic is increasing, decreasing, or stable.
  */
 const analyzeTrend = (history: number[]): { slope: number; trend: 'increasing' | 'decreasing' | 'stable' } => {
   if (history.length < 3) return { slope: 0, trend: 'stable' };
@@ -28,41 +27,53 @@ const analyzeTrend = (history: number[]): { slope: number; trend: 'increasing' |
 };
 
 /**
+ * SPEED TREND ANALYSIS: Predict whether speed is dropping (congestion forming).
+ */
+const analyzeSpeedTrend = (speeds: number[]): { trend: 'slowing' | 'accelerating' | 'stable'; predictedSpeed: number } => {
+  if (speeds.length < 3) return { trend: 'stable', predictedSpeed: speeds[speeds.length - 1] || 30 };
+  const { slope, trend } = analyzeTrend(speeds);
+  const predictedSpeed = Math.max(0, Math.round(speeds[speeds.length - 1] + slope * 2));
+  const speedTrend = trend === 'decreasing' ? 'slowing' : trend === 'increasing' ? 'accelerating' : 'stable';
+  return { trend: speedTrend, predictedSpeed };
+};
+
+/**
  * Generate ML predictions for each lane based on historical data.
- * Uses trend analysis to recommend signal timing adjustments.
  */
 export const generatePredictions = (
   currentCounts: VehicleCountEntry[],
   historicalData: HistoricalDataPoint[]
 ): MLPrediction[] => {
   return currentCounts.map(entry => {
-    // Get history for this lane
     const laneHistory = historicalData
       .filter(h => h.laneId === entry.laneId)
-      .slice(-10)
-      .map(h => h.vehicleCount);
+      .slice(-10);
 
-    // Add current count
-    laneHistory.push(entry.count);
+    const countHistory = laneHistory.map(h => h.vehicleCount);
+    countHistory.push(entry.count);
 
-    const { slope, trend } = analyzeTrend(laneHistory);
+    const speedHistory = laneHistory.map(h => h.averageSpeed);
 
-    // Predict next count
+    const { slope, trend } = analyzeTrend(countHistory);
+    const { trend: speedTrend, predictedSpeed } = analyzeSpeedTrend(speedHistory);
+
     const predictedCount = Math.max(0, Math.round(entry.count + slope * 2));
+    const confidence = Math.min(0.95, 0.5 + countHistory.length * 0.05);
 
-    // Confidence based on data availability
-    const confidence = Math.min(0.95, 0.5 + laneHistory.length * 0.05);
-
-    // Recommended adjustment: extend green if traffic increasing, shorten if decreasing
     let recommendedAdjustment = 0;
     if (trend === 'increasing') recommendedAdjustment = Math.min(10, Math.round(slope * 3));
     if (trend === 'decreasing') recommendedAdjustment = Math.max(-5, Math.round(slope * 2));
+    // Speed-based adjustment: if speed is dropping, extend green
+    if (speedTrend === 'slowing') recommendedAdjustment += 2;
+    if (speedTrend === 'accelerating') recommendedAdjustment -= 1;
 
     return {
       laneId: entry.laneId,
       predictedCount,
+      predictedSpeed,
       confidence,
       trend,
+      speedTrend,
       recommendedAdjustment,
     };
   });
@@ -74,7 +85,11 @@ export const generatePredictions = (
 export const getMLInsightSummary = (predictions: MLPrediction[]): string => {
   const increasing = predictions.filter(p => p.trend === 'increasing');
   const decreasing = predictions.filter(p => p.trend === 'decreasing');
+  const slowing = predictions.filter(p => p.speedTrend === 'slowing');
 
+  if (slowing.length > 0) {
+    return `Speed drop detected on ${slowing.length} lane(s) — congestion forming. Signal timing adjusted proactively.`;
+  }
   if (increasing.length > decreasing.length) {
     return `Traffic building up on ${increasing.length} lane(s). Signal timing extended proactively.`;
   } else if (decreasing.length > increasing.length) {

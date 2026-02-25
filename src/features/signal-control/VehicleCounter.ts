@@ -71,12 +71,8 @@ export class VehicleCounter {
   }
 
   private getLaneName(laneId: string): string {
-    const names: Record<string, string> = {
-      'lane-N': 'North Lane', 'lane-S': 'South Lane',
-      'lane-E': 'East Lane', 'lane-W': 'West Lane',
-      'lane-N2': 'North Lane', 'lane-S2': 'South Lane',
-      'lane-E2': 'East Lane', 'lane-W2': 'West Lane',
-    };
-    return names[laneId] || laneId;
+    const dir = laneId.replace(/\d+/g, '').replace('lane-', '');
+    const dirMap: Record<string, string> = { N: 'North Lane', S: 'South Lane', E: 'East Lane', W: 'West Lane' };
+    return dirMap[dir] || laneId;
   }
 }

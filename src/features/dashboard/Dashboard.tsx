@@ -18,15 +18,18 @@ const Dashboard = () => {
               ML-Based Intelligent Traffic Management
             </h1>
             <span className="text-xs font-mono text-muted-foreground">
-              v2.1 — Adaptive + Detection
+              v3.0 — Multi-Junction + Speed-Aware
             </span>
           </div>
           <div className="flex items-center gap-3">
             {sim.emergencyActive && (
               <span className="text-xs px-2 py-1 rounded-md bg-destructive/20 text-destructive border border-destructive/30 animate-pulse font-medium">
-                🚨 Emergency
+                🚨 Emergency Override
               </span>
             )}
+            <span className="text-[10px] font-mono text-muted-foreground bg-secondary/50 px-2 py-1 rounded-md">
+              {sim.intersections.length} Junctions
+            </span>
             <select
               value={sim.activeScenario}
               onChange={e => sim.setScenario(e.target.value)}
@@ -62,12 +65,12 @@ const Dashboard = () => {
         </div>
 
         {/* KPIs */}
-        <KpiCards metrics={sim.metrics[0]} elapsedSeconds={sim.elapsedSeconds} />
+        <KpiCards metrics={sim.metrics[0]} elapsedSeconds={sim.elapsedSeconds} junctionSummaries={sim.junctionSummaries} />
 
-        {/* Traffic Map */}
+        {/* Traffic Map - All 6 Junctions */}
         <section>
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-            Live Intersection Control
+            Live Multi-Junction Control — {sim.intersections.length} Intersections
           </h2>
           <TrafficMap intersections={sim.intersections} />
         </section>
@@ -86,6 +89,9 @@ const Dashboard = () => {
           currentPattern={sim.currentPattern}
           emergencyActive={sim.emergencyActive}
           emergencyLane={sim.emergencyLane}
+          junctionSummaries={sim.junctionSummaries}
+          trafficFlows={sim.trafficFlows}
+          emergencyLogs={sim.emergencyLogs}
         />
       </main>
     </div>

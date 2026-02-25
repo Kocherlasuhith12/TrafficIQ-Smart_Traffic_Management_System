@@ -11,6 +11,12 @@ const MLInsights = ({ predictions }: MLInsightsProps) => {
     return '➡️';
   };
 
+  const speedTrendIcon = (t: string) => {
+    if (t === 'slowing') return '🐌';
+    if (t === 'accelerating') return '🏎️';
+    return '➡️';
+  };
+
   const trendColor = (t: string) => {
     if (t === 'increasing') return 'text-accent';
     if (t === 'decreasing') return 'text-primary';
@@ -28,23 +34,29 @@ const MLInsights = ({ predictions }: MLInsightsProps) => {
       ) : (
         <div className="space-y-3">
           {predictions.map(p => (
-            <div key={p.laneId} className="flex items-center justify-between text-xs">
-              <div className="flex items-center gap-2">
-                <span>{trendIcon(p.trend)}</span>
-                <span className="text-muted-foreground font-mono">{p.laneId}</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className={trendColor(p.trend)}>
-                  {p.predictedCount} predicted
-                </span>
-                <span className="text-muted-foreground">
-                  {Math.round(p.confidence * 100)}%
-                </span>
-                {p.recommendedAdjustment !== 0 && (
-                  <span className="text-xs font-mono text-primary">
-                    {p.recommendedAdjustment > 0 ? '+' : ''}{p.recommendedAdjustment}s
+            <div key={p.laneId} className="space-y-1">
+              <div className="flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2">
+                  <span>{trendIcon(p.trend)}</span>
+                  <span className="text-muted-foreground font-mono">{p.laneId}</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className={trendColor(p.trend)}>
+                    {p.predictedCount} predicted
                   </span>
-                )}
+                  <span className="text-muted-foreground">
+                    {Math.round(p.confidence * 100)}%
+                  </span>
+                  {p.recommendedAdjustment !== 0 && (
+                    <span className="text-xs font-mono text-primary">
+                      {p.recommendedAdjustment > 0 ? '+' : ''}{p.recommendedAdjustment}s
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-2 text-[10px] text-muted-foreground pl-6">
+                <span>{speedTrendIcon(p.speedTrend)}</span>
+                <span>Speed: {p.predictedSpeed} km/h ({p.speedTrend})</span>
               </div>
             </div>
           ))}
@@ -52,7 +64,7 @@ const MLInsights = ({ predictions }: MLInsightsProps) => {
       )}
       <div className="mt-4 pt-3 border-t border-border">
         <p className="text-[10px] text-muted-foreground">
-          ML Layer: Linear trend analysis on rolling 10-point window. Adjustments applied proactively.
+          ML Layer: Linear trend analysis on vehicle counts + speed. Speed drop anticipation for proactive timing adjustment.
         </p>
       </div>
     </div>

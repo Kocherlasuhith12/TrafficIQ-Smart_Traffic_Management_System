@@ -1,12 +1,14 @@
 import { AnomalyRecord } from '@/data/trafficDetectionDataset';
+import { EmergencyOverrideLog } from '@/types/traffic';
 
 interface EmergencyPriorityProps {
   anomalies: AnomalyRecord[];
   emergencyActive: boolean;
   emergencyLane: string | null;
+  emergencyLogs: EmergencyOverrideLog[];
 }
 
-const EmergencyPriority = ({ anomalies, emergencyActive, emergencyLane }: EmergencyPriorityProps) => {
+const EmergencyPriority = ({ anomalies, emergencyActive, emergencyLane, emergencyLogs }: EmergencyPriorityProps) => {
   const recentAnomalies = anomalies.slice(-10).reverse();
   const criticalCount = anomalies.filter(a => a.severity === 'critical' && !a.resolved).length;
   const highCount = anomalies.filter(a => a.severity === 'high' && !a.resolved).length;
@@ -28,7 +30,7 @@ const EmergencyPriority = ({ anomalies, emergencyActive, emergencyLane }: Emerge
           <div className={`w-2 h-2 rounded-full ${emergencyActive ? 'bg-destructive' : 'bg-primary'}`} />
           <span className="text-xs font-medium text-foreground">
             {emergencyActive
-              ? `🚑 Emergency Vehicle — Priority to ${emergencyLane}`
+              ? `🚑 Emergency Vehicle — Priority Override → ${emergencyLane}`
               : '✅ No Active Emergencies'}
           </span>
         </div>
@@ -50,7 +52,22 @@ const EmergencyPriority = ({ anomalies, emergencyActive, emergencyLane }: Emerge
         </div>
       </div>
 
-      {/* Recent anomalies log */}
+      {/* Emergency override log */}
+      {emergencyLogs.length > 0 && (
+        <div className="mb-3">
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Override Log</p>
+          {emergencyLogs.slice(-3).reverse().map(l => (
+            <div key={l.id} className="flex items-center justify-between text-[10px] py-0.5 border-b border-border/50">
+              <span className="text-foreground">{l.junctionName} → {l.laneId}</span>
+              <span className={l.resolved ? 'text-primary' : 'text-destructive'}>
+                {l.resolved ? `✅ ${Math.round(l.durationMs / 1000)}s` : '⏳ Active'}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Recent anomalies */}
       <div className="space-y-1.5">
         <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Recent Events</p>
         {recentAnomalies.length === 0 ? (

@@ -17,59 +17,57 @@ const SignalLight = ({ state, active }: { state: string; active: boolean }) => {
   };
 
   return (
-    <div className="flex flex-col gap-1.5 bg-secondary/50 rounded-lg p-2 items-center">
-      <div className={getClass('RED')} />
-      <div className={getClass('YELLOW')} />
-      <div className={getClass('GREEN')} />
+    <div className="flex flex-col gap-1 bg-secondary/50 rounded-lg p-1.5 items-center">
+      <div className={getClass('RED')} style={{ width: 14, height: 14 }} />
+      <div className={getClass('YELLOW')} style={{ width: 14, height: 14 }} />
+      <div className={getClass('GREEN')} style={{ width: 14, height: 14 }} />
     </div>
   );
 };
 
 const LaneCard = ({
-  lane,
-  isActive,
-  signalState,
-  remainingTime,
+  lane, isActive, signalState, remainingTime,
 }: {
   lane: Intersection['lanes'][0];
   isActive: boolean;
   signalState: string;
   remainingTime: number;
 }) => {
-  const directionIcons: Record<string, string> = { N: '↑', S: '↓', E: '→', W: '←' };
+  const dirIcons: Record<string, string> = { N: '↑', S: '↓', E: '→', W: '←' };
+
+  const speedColor = lane.speedCategory === 'slow' ? 'text-destructive' : lane.speedCategory === 'fast' ? 'text-primary' : 'text-accent';
 
   return (
-    <div
-      className={`flex items-center gap-3 rounded-lg border p-3 transition-all ${
-        isActive
-          ? 'border-primary/40 bg-primary/5'
-          : 'border-border bg-card'
-      }`}
-    >
+    <div className={`flex items-center gap-2 rounded-lg border p-2 transition-all text-xs ${
+      isActive ? 'border-primary/40 bg-primary/5' : lane.isCongested ? 'border-destructive/30 bg-destructive/5' : 'border-border bg-card'
+    }`}>
       <SignalLight state={isActive ? signalState : 'RED'} active={true} />
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="text-lg">{directionIcons[lane.direction] || '•'}</span>
-          <span className="text-sm font-medium text-foreground">{lane.name}</span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-sm">{dirIcons[lane.direction] || '•'}</span>
+          <span className="font-medium text-foreground">{lane.name}</span>
+          {lane.isCongested && <span className="text-[9px] px-1 rounded bg-destructive/20 text-destructive">CONGESTED</span>}
+          {lane.isBlocked && <span className="text-[9px] px-1 rounded bg-destructive/30 text-destructive">BLOCKED</span>}
         </div>
-        <div className="flex items-center gap-4 mt-1">
-          <span className="text-xs text-muted-foreground">
-            🚗 <span className="font-mono font-semibold text-foreground">{lane.vehicleCount}</span> vehicles
+        <div className="flex items-center gap-3 mt-0.5">
+          <span className="text-muted-foreground">
+            🚗 <span className="font-mono font-semibold text-foreground">{lane.vehicleCount}</span>
           </span>
-          <span className="text-xs text-muted-foreground">
-            📊 Queue: <span className="font-mono">{lane.queueLength}</span>
+          <span className={`font-mono ${speedColor}`}>
+            {Math.round(lane.averageSpeed)} km/h
           </span>
+          <span className="text-muted-foreground font-mono">Q:{lane.queueLength}</span>
           {isActive && (
-            <span className="text-[10px] text-primary font-mono">
-              ⏱ Green ≈ {lane.vehicleCount}s
+            <span className="text-[9px] text-primary font-mono">
+              Green ≈ {lane.vehicleCount}s
             </span>
           )}
         </div>
       </div>
       {isActive && (
         <div className="text-right">
-          <div className="countdown-text text-primary">{formatCountdown(remainingTime)}</div>
-          <div className="text-[10px] text-muted-foreground uppercase tracking-wider">remaining</div>
+          <div className="font-mono text-lg font-bold text-primary tabular-nums">{formatCountdown(remainingTime)}</div>
+          <div className="text-[9px] text-muted-foreground uppercase">remaining</div>
         </div>
       )}
     </div>
@@ -78,16 +76,16 @@ const LaneCard = ({
 
 const TrafficMap = ({ intersections }: TrafficMapProps) => {
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
       {intersections.map(intersection => (
-        <div key={intersection.id} className="rounded-xl border border-border bg-card p-5 animate-fade-in">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-foreground">{intersection.name}</h3>
-            <span className="text-xs font-mono text-muted-foreground">
+        <div key={intersection.id} className="rounded-xl border border-border bg-card p-4 animate-fade-in">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-xs font-semibold text-foreground">{intersection.name}</h3>
+            <span className="text-[10px] font-mono text-muted-foreground">
               Cycle #{intersection.cycleCount}
             </span>
           </div>
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             {intersection.lanes.map(lane => (
               <LaneCard
                 key={lane.id}

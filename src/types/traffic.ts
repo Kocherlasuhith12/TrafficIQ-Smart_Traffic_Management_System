@@ -1,6 +1,7 @@
 // ─── Core Traffic Types ───
 
 export type SignalState = 'RED' | 'YELLOW' | 'GREEN';
+export type SpeedCategory = 'slow' | 'normal' | 'fast';
 
 export interface Lane {
   id: string;
@@ -8,6 +9,10 @@ export interface Lane {
   direction: 'N' | 'S' | 'E' | 'W';
   vehicleCount: number;
   queueLength: number;
+  averageSpeed: number;
+  speedCategory: SpeedCategory;
+  isCongested: boolean;
+  isBlocked: boolean;
 }
 
 export interface Intersection {
@@ -26,6 +31,7 @@ export interface SignalTiming {
   yellowDuration: number;
   isAdaptive: boolean;
   densityFactor: number;
+  speedFactor: number;
 }
 
 export interface TrafficMetrics {
@@ -36,6 +42,22 @@ export interface TrafficMetrics {
   queueLength: number;
   queueLengthFixed: number;
   congestionLevel: number;
+  averageSpeed: number;
+}
+
+export interface JunctionSummary {
+  id: string;
+  name: string;
+  totalVehicles: number;
+  averageSpeed: number;
+  averageWaitTime: number;
+  throughput: number;
+  congestionLevel: number;
+  activeLane: string;
+  signalState: SignalState;
+  remainingGreenTime: number;
+  isBottleneck: boolean;
+  isHighFlow: boolean;
 }
 
 export interface VehicleCountEntry {
@@ -48,8 +70,10 @@ export interface VehicleCountEntry {
 export interface MLPrediction {
   laneId: string;
   predictedCount: number;
+  predictedSpeed: number;
   confidence: number;
   trend: 'increasing' | 'decreasing' | 'stable';
+  speedTrend: 'slowing' | 'accelerating' | 'stable';
   recommendedAdjustment: number; // seconds to add/subtract
 }
 
@@ -59,6 +83,7 @@ export interface HistoricalDataPoint {
   vehicleCount: number;
   waitTime: number;
   greenDuration: number;
+  averageSpeed: number;
 }
 
 export interface TrafficScenario {
@@ -66,4 +91,23 @@ export interface TrafficScenario {
   name: string;
   description: string;
   laneConfigs: { laneId: string; baseCount: number; variance: number }[];
+}
+
+export interface TrafficFlowMetrics {
+  laneId: string;
+  speedBeforeSignal: number;
+  speedDuringGreen: number;
+  speedAfterCrossing: number;
+  signalEfficiency: number; // 0-1
+  clearanceRate: number; // vehicles cleared per second
+}
+
+export interface EmergencyOverrideLog {
+  id: string;
+  timestamp: number;
+  laneId: string;
+  junctionId: string;
+  junctionName: string;
+  durationMs: number;
+  resolved: boolean;
 }

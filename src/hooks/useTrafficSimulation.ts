@@ -2,11 +2,11 @@
 // Main simulation hook that drives the entire traffic system.
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Intersection, TrafficMetrics, MLPrediction, HistoricalDataPoint } from '@/types/traffic';
+import { Intersection, TrafficMetrics, MLPrediction, HistoricalDataPoint, JunctionSummary, TrafficFlowMetrics, EmergencyOverrideLog } from '@/types/traffic';
 import { SignalController } from '@/features/signal-control/SignalController';
 import { createDefaultIntersections, generateHistoricalData } from '@/data/mockTrafficData';
-import { createSignalController1, createSignalController2 } from '@/services/signalService';
-import { getTrafficMetrics } from '@/services/trafficService';
+import { createAllControllers } from '@/services/signalService';
+import { getTrafficMetrics, getJunctionSummary, getTrafficFlowMetrics } from '@/services/trafficService';
 import { generatePredictions, getMLInsightSummary } from '@/services/mlService';
 import { trafficScenarios } from '@/data/scenarios';
 import {
@@ -25,7 +25,6 @@ export interface SimulationState {
   activeScenario: string;
   historicalData: HistoricalDataPoint[];
   elapsedSeconds: number;
-  // New detection data
   detections: DetectionEvent[];
   anomalies: AnomalyRecord[];
   trafficPatterns: TrafficPattern[];
@@ -34,6 +33,9 @@ export interface SimulationState {
   currentPattern: TrafficPattern | null;
   emergencyActive: boolean;
   emergencyLane: string | null;
+  junctionSummaries: JunctionSummary[];
+  trafficFlows: TrafficFlowMetrics[];
+  emergencyLogs: EmergencyOverrideLog[];
 }
 
 export const useTrafficSimulation = () => {
@@ -42,9 +44,10 @@ export const useTrafficSimulation = () => {
     const intersections = createDefaultIntersections();
     const historical = generateHistoricalData();
     const patterns = generateTrafficPatterns();
+    const metrics = intersections.map(i => getTrafficMetrics(i));
     return {
       intersections,
-      metrics: intersections.map(i => getTrafficMetrics(i)),
+      metrics,
       predictions: [],
       mlInsight: 'Initializing ML analysis...',
       isRunning: true,
@@ -59,15 +62,17 @@ export const useTrafficSimulation = () => {
       currentPattern: getCurrentPatternPrediction(patterns),
       emergencyActive: false,
       emergencyLane: null,
+      junctionSummaries: intersections.map((int, idx) => getJunctionSummary(int, metrics[idx])),
+      trafficFlows: getTrafficFlowMetrics(intersections[0]),
+      emergencyLogs: [],
     };
   });
 
-  // Initialize controllers
   useEffect(() => {
-    controllerRef.current = [createSignalController1(), createSignalController2()];
+    controllerRef.current = createAllControllers();
   }, []);
 
-  // Main simulation loop - 1 tick per second
+  // Main simulation loop
   useEffect(() => {
     if (!state.isRunning) return;
 
@@ -83,28 +88,28 @@ export const useTrafficSimulation = () => {
         });
 
         const metrics = updatedIntersections.map(i => getTrafficMetrics(i));
+        const junctionSummaries = updatedIntersections.map((int, idx) => getJunctionSummary(int, metrics[idx]));
+        const trafficFlows = getTrafficFlowMetrics(updatedIntersections[0]);
 
-        // Run ML predictions every 5 seconds
+        // ML predictions every 5 seconds
         let predictions = prev.predictions;
         let mlInsight = prev.mlInsight;
         if (prev.elapsedSeconds % 5 === 0) {
           const counts = updatedIntersections[0].lanes.map(l => ({
-            laneId: l.id,
-            laneName: l.name,
-            count: l.vehicleCount,
-            timestamp: Date.now(),
+            laneId: l.id, laneName: l.name, count: l.vehicleCount, timestamp: Date.now(),
           }));
           predictions = generatePredictions(counts, prev.historicalData);
           mlInsight = getMLInsightSummary(predictions);
         }
 
-        // Generate detection events every 3 seconds
+        // Detection events every 3 seconds
         let detections = prev.detections;
         let anomalies = prev.anomalies;
         let vehicleDistribution = prev.vehicleDistribution;
         let averageSpeed = prev.averageSpeed;
         let emergencyActive = prev.emergencyActive;
         let emergencyLane = prev.emergencyLane;
+        let emergencyLogs = prev.emergencyLogs;
 
         if (prev.elapsedSeconds % 3 === 0) {
           const allDetections: DetectionEvent[] = [];
@@ -122,18 +127,28 @@ export const useTrafficSimulation = () => {
           vehicleDistribution = getVehicleTypeDistribution(allDetections);
           averageSpeed = getAverageSpeed(allDetections);
 
-          // Check for emergency vehicles
           const emergencyAnomaly = newAnomalies.find(a => a.type === 'emergency_vehicle');
           if (emergencyAnomaly) {
             emergencyActive = true;
             emergencyLane = emergencyAnomaly.laneId;
+            controllers[0]?.setEmergencyOverride(emergencyAnomaly.laneId);
+            emergencyLogs = [...emergencyLogs, {
+              id: `eo-${Date.now()}`,
+              timestamp: Date.now(),
+              laneId: emergencyAnomaly.laneId,
+              junctionId: 'int-1',
+              junctionName: updatedIntersections[0].name,
+              durationMs: 0,
+              resolved: false,
+            }].slice(-20);
           } else if (prev.emergencyActive && prev.elapsedSeconds % 15 === 0) {
             emergencyActive = false;
             emergencyLane = null;
+            controllers[0]?.setEmergencyOverride(null);
+            emergencyLogs = emergencyLogs.map(l => l.resolved ? l : { ...l, resolved: true, durationMs: Date.now() - l.timestamp });
           }
         }
 
-        // Update current pattern every 60 seconds
         let currentPattern = prev.currentPattern;
         if (prev.elapsedSeconds % 60 === 0) {
           currentPattern = getCurrentPatternPrediction(prev.trafficPatterns);
@@ -153,6 +168,9 @@ export const useTrafficSimulation = () => {
           currentPattern,
           emergencyActive,
           emergencyLane,
+          junctionSummaries,
+          trafficFlows,
+          emergencyLogs,
         };
       });
     }, 1000);
@@ -180,9 +198,5 @@ export const useTrafficSimulation = () => {
     });
   }, []);
 
-  return {
-    ...state,
-    toggleSimulation,
-    setScenario,
-  };
+  return { ...state, toggleSimulation, setScenario };
 };
