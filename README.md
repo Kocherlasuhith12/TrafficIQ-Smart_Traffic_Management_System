@@ -203,7 +203,7 @@ The `SignalController` implements a **deterministic, cycle-locked state machine*
 │                                           └──────────────────┘  │
 └──────────────────────────────────────────────────────────────────┘
 ```
-
+ 
 **Cycle-Locking Rules:**
 
 1. Once a GREEN phase begins, the controller is **fully locked** — no external event can alter the signal
