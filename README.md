@@ -4,7 +4,7 @@
 <img src="https://img.shields.io/badge/TypeScript-5.x-3178C6?style=for-the-badge&logo=typescript" />
 <img src="https://img.shields.io/badge/Vite-5.x-646CFF?style=for-the-badge&logo=vite" />
 <img src="https://img.shields.io/badge/ML-Integrated-FF6B35?style=for-the-badge"/> 
-
+ 
 <br/><br/>
 
 # 🚦 Intelligent Traffic Management System
