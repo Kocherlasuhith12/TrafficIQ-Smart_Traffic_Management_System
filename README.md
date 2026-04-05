@@ -7,7 +7,7 @@
  
 <br/><br/>
 
-# 🚦 Intelligent Traffic Management System 
+# 🚦 Intelligent Traffic Management System
 
 ### *Real-Time, ML-Powered Adaptive Signal Control Platform*
 
