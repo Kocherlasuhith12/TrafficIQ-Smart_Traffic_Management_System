@@ -12,7 +12,7 @@
 ### *Real-Time, ML-Powered Adaptive Signal Control Platform*
 
 > A simulation-based intelligent traffic signal control platform that dynamically optimizes signal timing using **vehicle density**, **vehicle speed**, **multi-junction analysis**, **emergency vehicle prioritization**, and **ML-assisted predictive control** — achieving up to 40% reduction in average wait time over fixed-cycle systems.
-
+ 
 <br/>
 
 [**Live Demo**](#13-running-the-project) · [**Architecture**](#4-system-architecture) · [**ML Engine**](#10-ml-role-in-traffic-optimization) · [**Results**](#11-performance-metrics--results)
