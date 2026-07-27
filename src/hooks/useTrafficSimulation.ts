@@ -1,5 +1,6 @@
 // ─── useTrafficSimulation.ts ───
-// Main simulation hook that drives the entire traffic system.
+// Synchronized traffic simulation hook supporting both live production WebSocket
+// stream updates and fallback client-side simulation when backend is offline.
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Intersection, TrafficMetrics, MLPrediction, HistoricalDataPoint, JunctionSummary, TrafficFlowMetrics, EmergencyOverrideLog } from '@/types/traffic';
@@ -9,6 +10,7 @@ import { createAllControllers } from '@/services/signalService';
 import { getTrafficMetrics, getJunctionSummary, getTrafficFlowMetrics } from '@/services/trafficService';
 import { generatePredictions, getMLInsightSummary } from '@/services/mlService';
 import { trafficScenarios } from '@/data/scenarios';
+import { wsService } from '@/services/websocketService';
 import {
   DetectionEvent, AnomalyRecord, TrafficPattern,
   generateDetectionBatch, detectAnomalies, generateTrafficPatterns,
@@ -40,6 +42,9 @@ export interface SimulationState {
 
 export const useTrafficSimulation = () => {
   const controllerRef = useRef<SignalController[]>([]);
+  const lastWsUpdateRef = useRef<number>(0);
+  const isWsConnectedRef = useRef<boolean>(false);
+
   const [state, setState] = useState<SimulationState>(() => {
     const intersections = createDefaultIntersections();
     const historical = generateHistoricalData();
@@ -68,15 +73,48 @@ export const useTrafficSimulation = () => {
     };
   });
 
+  // Subscribe to backend WebSocket
+  useEffect(() => {
+    wsService.connect();
+    
+    const unsubscribe = wsService.subscribe((payload) => {
+      // Mark that we received a WebSocket update
+      lastWsUpdateRef.current = Date.now();
+      isWsConnectedRef.current = true;
+
+      // Update state with backend data
+      setState(prev => ({
+        ...prev,
+        ...payload
+      }));
+    });
+
+    return () => {
+      unsubscribe();
+      wsService.disconnect();
+    };
+  }, []);
+
+  // Initialize local controllers for fallback mode
   useEffect(() => {
     controllerRef.current = createAllControllers();
   }, []);
 
-  // Main simulation loop
+  // Fallback Local Simulation Loop (runs ONLY when WebSocket is disconnected or silent)
   useEffect(() => {
     if (!state.isRunning) return;
 
     const interval = setInterval(() => {
+      // If we received a WebSocket update recently, skip the local tick
+      if (Date.now() - lastWsUpdateRef.current < 2500) {
+        return;
+      }
+
+      if (isWsConnectedRef.current) {
+        console.warn('WebSocket stream timed out. Switching back to Client-Side Simulation Mode.');
+        isWsConnectedRef.current = false;
+      }
+
       setState(prev => {
         const controllers = controllerRef.current;
         if (controllers.length === 0) return prev;
@@ -179,23 +217,33 @@ export const useTrafficSimulation = () => {
   }, [state.isRunning]);
 
   const toggleSimulation = useCallback(() => {
-    setState(prev => ({ ...prev, isRunning: !prev.isRunning }));
+    // If backend is active, propagate command, otherwise run locally
+    if (Date.now() - lastWsUpdateRef.current < 2500) {
+      wsService.sendCommand('toggle');
+    } else {
+      setState(prev => ({ ...prev, isRunning: !prev.isRunning }));
+    }
   }, []);
 
   const setScenario = useCallback((scenarioId: string) => {
     const scenario = trafficScenarios.find(s => s.id === scenarioId);
     if (!scenario) return;
 
-    setState(prev => {
-      const updated = { ...prev, activeScenario: scenarioId };
-      const controller = controllerRef.current[0];
-      if (controller) {
-        scenario.laneConfigs.forEach(config => {
-          controller.getCounter().updateBaseCount(config.laneId, config.baseCount);
-        });
-      }
-      return updated;
-    });
+    // If backend is active, propagate command, otherwise run locally
+    if (Date.now() - lastWsUpdateRef.current < 2500) {
+      wsService.sendCommand('set_scenario', { scenarioId });
+    } else {
+      setState(prev => {
+        const updated = { ...prev, activeScenario: scenarioId };
+        const controller = controllerRef.current[0];
+        if (controller) {
+          scenario.laneConfigs.forEach(config => {
+            controller.getCounter().updateBaseCount(config.laneId, config.baseCount);
+          });
+        }
+        return updated;
+      });
+    }
   }, []);
 
   return { ...state, toggleSimulation, setScenario };

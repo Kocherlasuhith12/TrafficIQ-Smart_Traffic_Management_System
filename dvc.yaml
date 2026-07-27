@@ -1,0 +1,14 @@
+stages:
+  train-forecaster:
+    cmd: python3 -c "from backend.app.services.prediction_ai import prediction_ai; from backend.app.services.dataset_exporter import dataset_exporter; prediction_ai.train_on_dataset(dataset_exporter.csv_path)"
+    deps:
+      - backend/data/training_data.csv
+    outs:
+      - backend/data/models/gru_traffic_model.pt
+
+  train-congestion:
+    cmd: python3 -c "from backend.app.services.congestion_predictor import congestion_predictor; from backend.app.services.dataset_exporter import dataset_exporter; congestion_predictor.train_on_dataset(dataset_exporter.csv_path)"
+    deps:
+      - backend/data/training_data.csv
+    outs:
+      - backend/data/models/xgb_congestion_model.json

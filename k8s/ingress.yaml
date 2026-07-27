@@ -1,0 +1,42 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: trafficiq-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    # WebSocket support configurations
+    nginx.ingress.kubernetes.io/websocket-services: "backend"
+    nginx.ingress.kubernetes.io/connection-proxy-header: "Upgrade"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: trafficiq.local
+      http:
+        paths:
+          # Frontend static routing
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend
+                port:
+                  number: 80
+          # Backend REST APIs routing
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: backend
+                port:
+                  number: 8000
+          # WebSocket endpoints routing
+          - path: /api/v1/ws
+            pathType: Prefix
+            backend:
+              service:
+                name: backend
+                port:
+                  number: 8000

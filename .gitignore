@@ -22,3 +22,15 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Python & Backend
+venv/
+backend/venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.env.*
+.pytest_cache/
+.coverage
