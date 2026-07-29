@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,6 +27,17 @@ const DEFAULT_USERS: Record<string, RegisteredUser> = {
   guest: { username: 'guest', passwordHash: 'guest', role: 'guest', displayName: 'Guest Watcher' },
 };
 
+const INITIAL_LOGS = [
+  '[SYS_INIT] Booting TrafficIQ Core Engine v3.8.4...',
+  '[NET_LOAD] Connecting to city camera array (102 active channels)...',
+  '[DB_CONN] Connected to Postgres storage cluster on port 5432.',
+  '[REDIS_OK] Redis hot-state cache initialized.',
+  '[YOLO_INIT] Loading YOLOv11 detection weights (GPU thread active)...',
+  '[ML_LOAD] Pre-trained junction congestion matrices parsed.',
+  '[SEC_SHIELD] Operational Firewall Level 5 initialized.',
+  '[READY] Standing by. Awaiting Operator credentials...'
+];
+
 const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   const [isRegistering, setIsRegistering] = useState(false);
   const [username, setUsername] = useState('');
@@ -35,6 +46,34 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   const [regRole, setRegRole] = useState<UserRole>('operator');
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  
+  // Terminal log simulation
+  const [logs, setLogs] = useState<string[]>(INITIAL_LOGS);
+  // Diagnostic counters
+  const [sensorRate, setSensorRate] = useState(98.4);
+  const [activeFeeds, setActiveFeeds] = useState(102);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      // Rotate metrics slightly to feel live
+      setSensorRate(prev => parseFloat((prev + (Math.random() * 0.4 - 0.2)).toFixed(1)));
+      if (Math.random() > 0.7) {
+        setActiveFeeds(prev => prev + (Math.random() > 0.5 ? 1 : -1));
+      }
+      
+      // Append a simulated log
+      const events = [
+        `[FEED_PING] Camera node CAM-${Math.floor(Math.random() * 50 + 10)} frame received.`,
+        `[ML_TICK] Recalculating queue lengths at Junction ${Math.floor(Math.random() * 6 + 1)}.`,
+        `[ANOMALY_SCAN] Checking streams for stopped vehicles... clear.`,
+        `[WEATHER_CHECK] Visibility constant: Clear (94%).`,
+        `[AGENT_TICK] Decision Agent sync complete.`
+      ];
+      const newLog = events[Math.floor(Math.random() * events.length)];
+      setLogs(prev => [...prev.slice(-10), `[${new Date().toLocaleTimeString('en-US', { hour12: false })}] ${newLog}`]);
+    }, 2800);
+    return () => clearInterval(interval);
+  }, []);
 
   const getUsersDb = (): Record<string, RegisteredUser> => {
     const saved = localStorage.getItem('traffic_users_db');
@@ -52,7 +91,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     if (matched && matched.passwordHash === normalizedPass) {
       onLoginSuccess({ username: matched.displayName, role: matched.role });
     } else {
-      setError('Invalid username or password.');
+      setError('Invalid operator credentials.');
       setSuccessMsg(null);
     }
   };
@@ -63,7 +102,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     const db = getUsersDb();
 
     if (db[normalizedUser]) {
-      setError('Operator ID already exists.');
+      setError('Operator ID already registered in database.');
       return;
     }
 
@@ -77,7 +116,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     const updatedDb = { ...db, [normalizedUser]: newUser };
     localStorage.setItem('traffic_users_db', JSON.stringify(updatedDb));
 
-    setSuccessMsg('Account registered successfully! Please log in.');
+    setSuccessMsg('Profile registered! Access granted. Enter credentials to login.');
     setError(null);
     setIsRegistering(false);
     
@@ -97,208 +136,326 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-[#070b13] p-4 relative overflow-hidden">
-      {/* Background radial glow */}
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full bg-[#f97316]/5 filter blur-[100px] pointer-events-none" />
-      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 rounded-full bg-[#3b82f6]/5 filter blur-[100px] pointer-events-none" />
+    <div className="min-h-screen w-full flex bg-[#09090B] text-[#F8FAFC] font-sans antialiased overflow-x-hidden relative">
+      {/* Laser Scanning Grid Line Overlay */}
+      <div className="absolute inset-0 bg-[linear-gradient(to_bottom,rgba(39,39,42,0.1)_1px,transparent_1px),linear-gradient(to_right,rgba(39,39,42,0.1)_1px,transparent_1px)] bg-[size:40px_40px] pointer-events-none" />
+      <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-[#f97316]/30 to-transparent animate-pulse pointer-events-none" style={{ animationDuration: '4s' }} />
 
-      <div className="w-full max-w-md flex flex-col gap-6 z-10 animate-fade-in">
-        {/* Branding header */}
-        <div className="text-center flex flex-col items-center gap-2">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#ef4444] via-[#f97316] to-[#22c55e] flex items-center justify-center text-2xl shadow-lg">
-            🚦
-          </div>
-          <h1 className="text-2xl font-black tracking-tight bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent">
-            TrafficIQ Hub
-          </h1>
-          <p className="text-xs text-muted-foreground font-mono">
-            Autonomous Smart City Traffic Control & ML Analytics
-          </p>
-        </div>
+      {/* Grid container */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 w-full min-h-screen relative z-10">
+        
+        {/* LEFT COLUMN: Telemetry HUD Panel (Tesla Vibe) */}
+        <div className="hidden lg:flex lg:col-span-7 flex-col justify-between p-8 border-r border-[#27272A]/80 bg-gradient-to-b from-[#09090B] via-[#0b0c10] to-[#09090B] relative overflow-hidden">
+          {/* Subtle glow nodes */}
+          <div className="absolute top-1/4 right-0 w-[500px] h-[500px] rounded-full bg-[#f97316]/5 filter blur-[120px] pointer-events-none" />
+          <div className="absolute bottom-1/4 left-0 w-[500px] h-[500px] rounded-full bg-[#3b82f6]/5 filter blur-[120px] pointer-events-none" />
 
-        {/* Form Card */}
-        <Card className="p-6 bg-card/60 border border-border backdrop-blur-md shadow-2xl flex flex-col gap-5">
-          <div className="border-b border-border pb-2 flex justify-between items-center">
+          {/* Logo & Branding */}
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#ef4444] via-[#f97316] to-[#22c55e] flex items-center justify-center text-xl shadow-[0_0_20px_rgba(249,115,22,0.25)] relative overflow-hidden">
+              <span className="animate-pulse">🚦</span>
+            </div>
             <div>
-              <h2 className="text-sm font-bold text-foreground">
-                {isRegistering ? 'Create Operator Account' : 'Operator Authentication'}
-              </h2>
-              <p className="text-[10px] text-muted-foreground font-mono mt-0.5 uppercase">
-                {isRegistering ? 'Smart city terminal registry' : 'Secure access control shield'}
+              <h1 className="text-lg font-black tracking-widest text-[#F8FAFC] uppercase font-mono">
+                TrafficIQ <span className="text-[#f97316]">AI</span>
+              </h1>
+              <p className="text-[9px] text-[#A1A1AA] tracking-widest font-mono uppercase">
+                Neural Smart City Command Core
               </p>
             </div>
+          </div>
+
+          {/* Core Dashboard Visual Simulation */}
+          <div className="my-8 flex flex-col gap-6">
+            {/* Holographic Radar Ring and Metrics */}
+            <div className="grid grid-cols-3 gap-4">
+              <div className="glass-card hover-card-trigger rounded-xl p-4 border border-[#27272A]">
+                <p className="text-[9px] font-mono text-[#A1A1AA] uppercase tracking-wider">Detection Acc.</p>
+                <p className="text-2xl font-bold font-mono text-[#22c55e] mt-1">{sensorRate}%</p>
+                <div className="w-full h-1 bg-[#27272A] rounded-full mt-2 overflow-hidden">
+                  <div className="h-full bg-[#22c55e] rounded-full transition-all duration-500" style={{ width: `${sensorRate}%` }} />
+                </div>
+              </div>
+
+              <div className="glass-card hover-card-trigger rounded-xl p-4 border border-[#27272A]">
+                <p className="text-[9px] font-mono text-[#A1A1AA] uppercase tracking-wider">Active CCTV</p>
+                <p className="text-2xl font-bold font-mono text-[#3b82f6] mt-1">{activeFeeds}</p>
+                <div className="flex items-center gap-1.5 mt-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#22c55e] live-glow-green" />
+                  <span className="text-[9px] text-[#22c55e] font-mono font-bold">STREAM ONLINE</span>
+                </div>
+              </div>
+
+              <div className="glass-card hover-card-trigger rounded-xl p-4 border border-[#27272A]">
+                <p className="text-[9px] font-mono text-[#A1A1AA] uppercase tracking-wider">Model Load</p>
+                <p className="text-2xl font-bold font-mono text-[#f97316] mt-1">4.2 ms</p>
+                <div className="w-full h-1 bg-[#27272A] rounded-full mt-2 overflow-hidden">
+                  <div className="h-full bg-[#f97316] rounded-full" style={{ width: '38%' }} />
+                </div>
+              </div>
+            </div>
+
+            {/* Neural Net Terminal Logs Widget */}
+            <div className="glass-card border border-[#27272A] rounded-xl overflow-hidden flex flex-col h-[280px]">
+              <div className="bg-[#111827]/80 border-b border-[#27272A] px-4 py-2 flex items-center justify-between">
+                <span className="text-[10px] font-mono font-semibold tracking-wider text-[#A1A1AA]">
+                  📡 LIVE AGENT TELEMETRY FEED
+                </span>
+                <span className="w-2 h-2 rounded-full bg-[#22c55e] live-glow-green" />
+              </div>
+              <div className="p-4 font-mono text-[10px] space-y-2 overflow-y-auto flex-1 text-[#A1A1AA]">
+                {logs.map((log, index) => {
+                  let colorClass = 'text-[#F8FAFC]/80';
+                  if (log.includes('[SYS_')) colorClass = 'text-[#f97316] font-semibold';
+                  if (log.includes('[READY') || log.includes('[REDIS_OK') || log.includes('_OK')) colorClass = 'text-[#22c55e]';
+                  if (log.includes('[ANOMALY_')) colorClass = 'text-[#3b82f6]';
+                  return (
+                    <div key={index} className={`leading-relaxed border-l-2 border-transparent pl-2 ${colorClass}`}>
+                      {log}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Footer stats */}
+          <div className="flex items-center justify-between text-[10px] text-[#A1A1AA] font-mono uppercase tracking-widest border-t border-[#27272A]/50 pt-4">
+            <span>Server: CLOUD-HQ-01</span>
+            <span>Latency: 28ms</span>
+            <span>Agent Orchestrator: ACTIVE</span>
+          </div>
+        </div>
+
+        {/* RIGHT COLUMN: Interactive Registration & Login Panels */}
+        <div className="col-span-1 lg:col-span-5 flex flex-col justify-center items-center p-6 lg:p-12 bg-gradient-to-br from-[#0e1017] to-[#09090B] relative">
+          
+          <div className="w-full max-w-sm flex flex-col gap-6">
             
-            <button
-              onClick={() => {
-                setIsRegistering(!isRegistering);
-                setError(null);
-                setSuccessMsg(null);
-              }}
-              className="text-[10px] text-[#f97316] font-bold hover:underline bg-transparent border-0 outline-none"
-            >
-              {isRegistering ? 'Sign In Instead' : 'Create Account'}
-            </button>
-          </div>
-
-          {error && (
-            <div className="text-xs text-[#ef4444] bg-[#ef4444]/10 p-2.5 rounded-lg border border-[#ef4444]/25">
-              ⚠️ {error}
+            {/* Branding mobile only header */}
+            <div className="flex lg:hidden flex-col items-center text-center gap-2 mb-2">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#ef4444] via-[#f97316] to-[#22c55e] flex items-center justify-center text-2xl shadow-lg">
+                🚦
+              </div>
+              <h1 className="text-xl font-black text-white">TrafficIQ AI</h1>
+              <p className="text-xs text-[#A1A1AA] font-mono">Neural Smart City Control Core</p>
             </div>
-          )}
 
-          {successMsg && (
-            <div className="text-xs text-[#22c55e] bg-[#22c55e]/10 p-2.5 rounded-lg border border-[#22c55e]/25">
-              ✓ {successMsg}
-            </div>
-          )}
+            {/* Main Auth Control Center */}
+            <Card className="glass-card border border-[#27272A] p-6 rounded-2xl flex flex-col gap-6 relative shadow-2xl overflow-hidden">
+              <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-[#f97316] to-[#ef4444]" />
 
-          {!isRegistering ? (
-            <form onSubmit={handleLogin} className="flex flex-col gap-4">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-semibold text-muted-foreground uppercase font-mono">Operator ID</label>
-                <Input
-                  required
-                  placeholder="Username (e.g. admin)"
-                  value={username}
-                  onChange={e => setUsername(e.target.value)}
-                  className="h-9 text-xs bg-background/50"
-                />
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-semibold text-muted-foreground uppercase font-mono">Verification Key</label>
-                <Input
-                  required
-                  type="password"
-                  placeholder="Password"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  className="h-9 text-xs bg-background/50"
-                />
-              </div>
-
-              <Button type="submit" className="h-9 text-xs font-bold w-full bg-[#f97316] hover:bg-[#e0620f] text-white">
-                Log In to Terminal
-              </Button>
-            </form>
-          ) : (
-            <form onSubmit={handleRegister} className="flex flex-col gap-4">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-semibold text-muted-foreground uppercase font-mono">Full Display Name</label>
-                <Input
-                  required
-                  placeholder="e.g. Senior Officer John"
-                  value={displayName}
-                  onChange={e => setDisplayName(e.target.value)}
-                  className="h-9 text-xs bg-background/50"
-                />
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-semibold text-muted-foreground uppercase font-mono">Desired Operator ID</label>
-                <Input
-                  required
-                  placeholder="Username to log in"
-                  value={username}
-                  onChange={e => setUsername(e.target.value)}
-                  className="h-9 text-xs bg-background/50"
-                />
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-semibold text-muted-foreground uppercase font-mono">Security Password</label>
-                <Input
-                  required
-                  type="password"
-                  placeholder="Password"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  className="h-9 text-xs bg-background/50"
-                />
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-semibold text-muted-foreground uppercase font-mono">Operational Access Role</label>
-                <select
-                  value={regRole}
-                  onChange={e => setRegRole(e.target.value as UserRole)}
-                  className="h-9 rounded-md bg-[#0a0f1b] border border-border px-3 py-1.5 text-xs text-white outline-none focus:border-[#f97316]/50"
+              {/* Title & Toggle buttons */}
+              <div className="flex justify-between items-center pb-2 border-b border-[#27272A]">
+                <div>
+                  <h2 className="text-sm font-bold text-white uppercase tracking-wider font-mono">
+                    {isRegistering ? 'SYS.REGISTER' : 'SYS.AUTHENTICATE'}
+                  </h2>
+                  <p className="text-[9px] text-[#A1A1AA] font-mono mt-0.5 tracking-wider">
+                    {isRegistering ? 'CREATING OPERATOR PROFILE' : 'ACCESS VERIFICATION SHIELD'}
+                  </p>
+                </div>
+                
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsRegistering(!isRegistering);
+                    setError(null);
+                    setSuccessMsg(null);
+                  }}
+                  className="text-[10px] text-[#f97316] hover:text-[#ff8f43] font-bold font-mono transition-colors tracking-wide outline-none"
                 >
-                  <option value="operator">👷 Operator (Incident checks & live feeds)</option>
-                  <option value="guest">👁️ Guest (Read-only data monitor)</option>
-                  <option value="admin">👑 Administrator (Full controller access)</option>
-                </select>
+                  {isRegistering ? 'SIGN_IN' : 'CREATE_ACCOUNT'}
+                </button>
               </div>
 
-              <Button type="submit" className="h-9 text-xs font-bold w-full bg-[#22c55e] hover:bg-[#1ea34d] text-white">
-                Register Operator Profile
-              </Button>
-            </form>
-          )}
+              {/* Notifications */}
+              {error && (
+                <div className="text-[11px] font-mono text-[#ef4444] bg-[#ef4444]/10 p-3 rounded-lg border border-[#ef4444]/20 animate-pulse">
+                  [ERR_LOG] {error}
+                </div>
+              )}
 
-          {/* Quick presets */}
-          <div className="flex flex-col gap-2.5 pt-3 border-t border-border/50">
-            <p className="text-[9px] text-muted-foreground font-mono text-center uppercase">Demonstration Quick Logins</p>
-            <div className="grid grid-cols-3 gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleQuickLogin('admin')}
-                className="h-7 text-[9px] font-bold border-red-500/20 hover:bg-red-500/10 text-red-500"
-              >
-                👑 Admin Preset
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleQuickLogin('operator')}
-                className="h-7 text-[9px] font-bold border-blue-500/20 hover:bg-blue-500/10 text-blue-500"
-              >
-                👷 Ops Preset
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleQuickLogin('guest')}
-                className="h-7 text-[9px] font-bold border-zinc-500/20 hover:bg-zinc-500/10 text-zinc-400"
-              >
-                👁️ Guest Preset
-              </Button>
-            </div>
-          </div>
-        </Card>
+              {successMsg && (
+                <div className="text-[11px] font-mono text-[#22c55e] bg-[#22c55e]/10 p-3 rounded-lg border border-[#22c55e]/20">
+                  [SYS_MSG] {successMsg}
+                </div>
+              )}
 
-        {/* Roles Details */}
-        <Card className="p-4 bg-[#0B1120]/40 border border-border/80 text-[10px] text-muted-foreground">
-          <p className="font-bold text-white/90 text-center uppercase tracking-wider mb-2 font-mono text-[9px]">
-            Role Permissions Shield
-          </p>
-          <div className="grid grid-cols-3 gap-2 border-b border-border/50 pb-1.5 font-bold text-white/70">
-            <span>Action</span>
-            <span>Admin</span>
-            <span>Operator</span>
+              {/* Forms */}
+              {!isRegistering ? (
+                <form onSubmit={handleLogin} className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[9px] font-bold text-[#A1A1AA] uppercase tracking-widest font-mono">
+                      Operator ID
+                    </label>
+                    <Input
+                      required
+                      placeholder="Enter Operator Username"
+                      value={username}
+                      onChange={e => setUsername(e.target.value)}
+                      className="h-10 text-xs bg-[#0b0d13]/70 border-[#27272A] hover:border-[#f97316]/50 focus:border-[#f97316] text-[#F8FAFC] transition-all font-mono"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[9px] font-bold text-[#A1A1AA] uppercase tracking-widest font-mono">
+                      Verification Key
+                    </label>
+                    <Input
+                      required
+                      type="password"
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={e => setPassword(e.target.value)}
+                      className="h-10 text-xs bg-[#0b0d13]/70 border-[#27272A] hover:border-[#f97316]/50 focus:border-[#f97316] text-[#F8FAFC] transition-all font-mono"
+                    />
+                  </div>
+
+                  <Button 
+                    type="submit" 
+                    className="h-10 text-xs font-bold w-full bg-gradient-to-r from-[#f97316] to-[#ef4444] hover:brightness-110 text-white shadow-[0_4px_12px_rgba(249,115,22,0.2)] transition-all font-mono tracking-widest uppercase mt-2"
+                  >
+                    Initialize Session
+                  </Button>
+                </form>
+              ) : (
+                <form onSubmit={handleRegister} className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[9px] font-bold text-[#A1A1AA] uppercase tracking-widest font-mono">
+                      Operator Display Name
+                    </label>
+                    <Input
+                      required
+                      placeholder="e.g. Inspector John"
+                      value={displayName}
+                      onChange={e => setDisplayName(e.target.value)}
+                      className="h-10 text-xs bg-[#0b0d13]/70 border-[#27272A] hover:border-[#f97316]/50 focus:border-[#f97316] text-[#F8FAFC] transition-all font-mono"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[9px] font-bold text-[#A1A1AA] uppercase tracking-widest font-mono">
+                      Operator ID (Username)
+                    </label>
+                    <Input
+                      required
+                      placeholder="Choose operator name"
+                      value={username}
+                      onChange={e => setUsername(e.target.value)}
+                      className="h-10 text-xs bg-[#0b0d13]/70 border-[#27272A] hover:border-[#f97316]/50 focus:border-[#f97316] text-[#F8FAFC] transition-all font-mono"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[9px] font-bold text-[#A1A1AA] uppercase tracking-widest font-mono">
+                      Verification Key (Password)
+                    </label>
+                    <Input
+                      required
+                      type="password"
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={e => setPassword(e.target.value)}
+                      className="h-10 text-xs bg-[#0b0d13]/70 border-[#27272A] hover:border-[#f97316]/50 focus:border-[#f97316] text-[#F8FAFC] transition-all font-mono"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[9px] font-bold text-[#A1A1AA] uppercase tracking-widest font-mono">
+                      System Access Role
+                    </label>
+                    <select
+                      value={regRole}
+                      onChange={e => setRegRole(e.target.value as UserRole)}
+                      className="h-10 rounded-md bg-[#0b0d13]/70 border border-[#27272A] px-3 py-1.5 text-xs text-[#F8FAFC] outline-none focus:border-[#f97316]/50 focus:border-[#f97316] transition-all font-mono"
+                    >
+                      <option value="operator">👷 Operator (Stream Control)</option>
+                      <option value="guest">👁️ Guest (Telemetry Monitoring Only)</option>
+                      <option value="admin">👑 Administrator (Total Bypass Control)</option>
+                    </select>
+                  </div>
+
+                  <Button 
+                    type="submit" 
+                    className="h-10 text-xs font-bold w-full bg-[#22c55e] hover:bg-[#1ea34d] text-white shadow-[0_4px_12px_rgba(34,197,94,0.2)] transition-all font-mono tracking-widest uppercase mt-2"
+                  >
+                    Register System Profile
+                  </Button>
+                </form>
+              )}
+
+              {/* Demo quick logins widgets (Tesla Grid) */}
+              <div className="flex flex-col gap-2.5 pt-4 border-t border-[#27272A]/80">
+                <p className="text-[8px] text-[#A1A1AA] font-mono text-center uppercase tracking-widest">
+                  Quick Access Simulation Presets
+                </p>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleQuickLogin('admin')}
+                    className="h-8 text-[9px] font-mono font-bold rounded-lg border border-red-500/20 hover:border-red-500/60 bg-red-500/5 hover:bg-red-500/10 text-red-500 transition-all flex flex-col justify-center items-center gap-0.5"
+                  >
+                    <span>👑</span>
+                    <span>ADMIN</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleQuickLogin('operator')}
+                    className="h-8 text-[9px] font-mono font-bold rounded-lg border border-blue-500/20 hover:border-blue-500/60 bg-blue-500/5 hover:bg-blue-500/10 text-blue-500 transition-all flex flex-col justify-center items-center gap-0.5"
+                  >
+                    <span>👷</span>
+                    <span>OPERATOR</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleQuickLogin('guest')}
+                    className="h-8 text-[9px] font-mono font-bold rounded-lg border border-zinc-500/20 hover:border-zinc-500/60 bg-zinc-500/5 hover:bg-zinc-500/10 text-zinc-400 transition-all flex flex-col justify-center items-center gap-0.5"
+                  >
+                    <span>👁️</span>
+                    <span>GUEST</span>
+                  </button>
+                </div>
+              </div>
+            </Card>
+
+            {/* Access control details */}
+            <div className="glass-card border border-[#27272A] p-4 rounded-xl text-[9px] text-[#A1A1AA] font-mono space-y-3">
+              <p className="font-bold text-white text-center uppercase tracking-widest text-[9px]">
+                🛡️ Security Protocol Matrices
+              </p>
+              <div className="space-y-1.5">
+                <div className="flex justify-between border-b border-[#27272A]/50 pb-1 text-white/50 font-bold">
+                  <span>CAPABILITY</span>
+                  <span>ADMIN</span>
+                  <span>OPERATOR</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Scenario Override</span>
+                  <span className="text-[#22c55e] font-bold">BYPASS_OK</span>
+                  <span className="text-[#ef4444] font-bold">NO_PERM</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Camera Nodes Management</span>
+                  <span className="text-[#22c55e] font-bold">BYPASS_OK</span>
+                  <span className="text-[#ef4444] font-bold">NO_PERM</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Emergency Green Corridor</span>
+                  <span className="text-[#22c55e] font-bold">BYPASS_OK</span>
+                  <span className="text-[#22c55e] font-bold">BYPASS_OK</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Telemetry Feeds Monitor</span>
+                  <span className="text-[#22c55e] font-bold">BYPASS_OK</span>
+                  <span className="text-[#22c55e] font-bold">BYPASS_OK</span>
+                </div>
+              </div>
+            </div>
+
           </div>
-          <div className="space-y-1 mt-1.5 font-mono text-[9px]">
-            <div className="grid grid-cols-3">
-              <span>Weather/Scenarios</span><span className="text-[#22c55e]">✔</span><span className="text-[#ef4444]">✘</span>
-            </div>
-            <div className="grid grid-cols-3">
-              <span>Add/Delete Camera</span><span className="text-[#22c55e]">✔</span><span className="text-[#ef4444]">✘</span>
-            </div>
-            <div className="grid grid-cols-3">
-              <span>Emergency override</span><span className="text-[#22c55e]">✔</span><span className="text-[#22c55e]">✔</span>
-            </div>
-            <div className="grid grid-cols-3">
-              <span>Resolve Incident</span><span className="text-[#22c55e]">✔</span><span className="text-[#22c55e]">✔</span>
-            </div>
-            <div className="grid grid-cols-3">
-              <span>Live Monitor</span><span className="text-[#22c55e]">✔</span><span className="text-[#22c55e]">✔</span>
-            </div>
-          </div>
-          <p className="text-[9px] text-muted-foreground/80 mt-2 text-center">
-            *Guest is read-only (all interactive control components are disabled)
-          </p>
-        </Card>
+        </div>
+
       </div>
     </div>
   );
