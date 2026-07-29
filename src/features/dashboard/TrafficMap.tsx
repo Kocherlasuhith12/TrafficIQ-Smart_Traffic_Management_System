@@ -35,19 +35,27 @@ const LaneCard = ({
 }) => {
   const dirIcons: Record<string, string> = { N: '↑', S: '↓', E: '→', W: '←' };
 
-  const speedColor = lane.speedCategory === 'slow' ? 'text-destructive' : lane.speedCategory === 'fast' ? 'text-primary' : 'text-accent';
+  const speedColor = lane.speedCategory === 'slow' 
+    ? 'text-[#ef4444]' 
+    : lane.speedCategory === 'fast' 
+      ? 'text-[#22c55e]' 
+      : 'text-[#f97316]';
 
   return (
-    <div className={`flex items-center gap-2 rounded-lg border p-2 transition-all text-xs ${
-      isActive ? 'border-primary/40 bg-primary/5' : lane.isCongested ? 'border-destructive/30 bg-destructive/5' : 'border-border bg-card'
+    <div className={`flex items-center gap-2 rounded-lg border p-2.5 transition-all duration-300 text-xs ${
+      isActive 
+        ? 'border-[#22c55e]/40 bg-[#22c55e]/5 shadow-[0_0_12px_rgba(34,197,94,0.05)]' 
+        : lane.isCongested || lane.isBlocked 
+          ? 'border-[#ef4444]/40 bg-[#ef4444]/5 shadow-[0_0_12px_rgba(239,68,68,0.05)]' 
+          : 'border-border bg-card hover:border-border/80'
     }`}>
       <SignalLight state={isActive ? signalState : 'RED'} active={true} />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
           <span className="text-sm">{dirIcons[lane.direction] || '•'}</span>
           <span className="font-medium text-foreground">{lane.name}</span>
-          {lane.isCongested && <span className="text-[9px] px-1 rounded bg-destructive/20 text-destructive">CONGESTED</span>}
-          {lane.isBlocked && <span className="text-[9px] px-1 rounded bg-destructive/30 text-destructive">BLOCKED</span>}
+          {lane.isCongested && <span className="text-[9px] px-1.5 py-0.5 rounded bg-destructive/20 text-destructive font-semibold">CONGESTED</span>}
+          {lane.isBlocked && <span className="text-[9px] px-1.5 py-0.5 rounded bg-destructive/30 text-destructive font-semibold">BLOCKED</span>}
         </div>
         <div className="flex items-center gap-3 mt-0.5">
           <span className="text-muted-foreground">
@@ -58,7 +66,7 @@ const LaneCard = ({
           </span>
           <span className="text-muted-foreground font-mono">Q:{lane.queueLength}</span>
           {isActive && (
-            <span className="text-[9px] text-primary font-mono">
+            <span className="text-[9px] text-[#22c55e] font-mono">
               Green ≈ {lane.vehicleCount}s
             </span>
           )}
@@ -66,8 +74,8 @@ const LaneCard = ({
       </div>
       {isActive && (
         <div className="text-right">
-          <div className="font-mono text-lg font-bold text-primary tabular-nums">{formatCountdown(remainingTime)}</div>
-          <div className="text-[9px] text-muted-foreground uppercase">remaining</div>
+          <div className="font-mono text-lg font-bold text-[#22c55e] tabular-nums">{formatCountdown(remainingTime)}</div>
+          <div className="text-[9px] text-muted-foreground uppercase font-semibold tracking-wider">remaining</div>
         </div>
       )}
     </div>

@@ -14,11 +14,24 @@ COPY . .
 # Build output
 RUN npm run build
 
-# Serve with Nginx
+# Serve with Nginx SSL gateway
 FROM nginx:alpine
+
+# Install openssl to generate self-signed keys
+RUN apk add --no-cache openssl
+
+# Create directories and generate self-signed SSL credentials
+RUN mkdir -p /etc/nginx/certs && \
+    openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+    -keyout /etc/nginx/certs/trafficiq.key \
+    -out /etc/nginx/certs/trafficiq.crt \
+    -subj "/C=US/ST=State/L=City/O=TrafficIQ/CN=localhost"
+
+# Copy reverse proxy config
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
 COPY --from=build /app/dist /usr/share/nginx/html
 
-# Copy custom nginx config if we want, or use default
-EXPOSE 80
+EXPOSE 80 443
 
 CMD ["nginx", "-g", "daemon off;"]

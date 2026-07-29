@@ -1,6 +1,6 @@
 import { Intersection, TrafficMetrics, MLPrediction, HistoricalDataPoint, JunctionSummary, TrafficFlowMetrics, EmergencyOverrideLog } from '@/types/traffic';
 import { DetectionEvent, AnomalyRecord, TrafficPattern, VehicleType } from '@/data/trafficDetectionDataset';
-import TrafficCharts from './TrafficCharts';
+import AnalyticsReports from './AnalyticsReports';
 import CongestionAnalysis from './CongestionAnalysis';
 import ModelMetrics from './ModelMetrics';
 import FeatureImportance from './FeatureImportance';
@@ -9,6 +9,10 @@ import TrafficDetectionFeed from './TrafficDetectionFeed';
 import VehicleClassification from './VehicleClassification';
 import PeakHourAnalysis from './PeakHourAnalysis';
 import EmergencyPriority from './EmergencyPriority';
+import IntelligentAnalytics from './IntelligentAnalytics';
+import IncidentTimeline from './IncidentTimeline';
+import SmartCityHub from '@/features/smart-city/SmartCityHub';
+import { SimulationState, WeatherCondition } from '@/hooks/useTrafficSimulation';
 
 interface AnalyticsProps {
   intersections: Intersection[];
@@ -26,6 +30,8 @@ interface AnalyticsProps {
   junctionSummaries: JunctionSummary[];
   trafficFlows: TrafficFlowMetrics[];
   emergencyLogs: EmergencyOverrideLog[];
+  simState?: SimulationState;
+  onWeatherChange?: (w: WeatherCondition) => void;
 }
 
 const Analytics = ({
@@ -33,6 +39,7 @@ const Analytics = ({
   detections, anomalies, trafficPatterns, vehicleDistribution,
   averageSpeed, currentPattern, emergencyActive, emergencyLane,
   junctionSummaries, trafficFlows, emergencyLogs,
+  simState, onWeatherChange,
 }: AnalyticsProps) => {
   return (
     <section className="space-y-6">
@@ -58,12 +65,24 @@ const Analytics = ({
       <LaneIntelligence intersections={intersections} />
 
       <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+        🧠 Intelligent Behavioral Analytics
+      </h2>
+      <IntelligentAnalytics intersections={intersections} metrics={metrics[0]} historicalData={historicalData} />
+
+      <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
         Analytics & ML Insights
       </h2>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <TrafficCharts intersections={intersections} historicalData={historicalData} />
+        <AnalyticsReports intersections={intersections} historicalData={historicalData} metrics={metrics[0]} />
         <CongestionAnalysis metrics={metrics[0]} />
+      </div>
+
+      <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+        🚨 Incident Detection & Response
+      </h2>
+      <div id="incident-timeline-section">
+        <IncidentTimeline anomalies={anomalies as any} />
       </div>
 
       <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
@@ -79,11 +98,6 @@ const Analytics = ({
         <MLInsights predictions={predictions} />
         <PeakHourAnalysis patterns={trafficPatterns} currentPattern={currentPattern} />
         <EmergencyPriority anomalies={anomalies} emergencyActive={emergencyActive} emergencyLane={emergencyLane} emergencyLogs={emergencyLogs} />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <ModelMetrics metrics={metrics[0]} />
-        <FeatureImportance />
       </div>
     </section>
   );
@@ -320,3 +334,4 @@ const LaneIntelligence = ({ intersections }: { intersections: Intersection[] }) 
 };
 
 export default Analytics;
+

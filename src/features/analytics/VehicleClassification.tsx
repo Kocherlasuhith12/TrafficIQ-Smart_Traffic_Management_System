@@ -10,8 +10,17 @@ const typeLabels: Record<VehicleType, { icon: string; label: string; color: stri
   truck: { icon: '🚛', label: 'Trucks', color: 'bg-accent' },
   bus: { icon: '🚌', label: 'Buses', color: 'bg-[hsl(var(--chart-blue))]' },
   motorcycle: { icon: '🏍️', label: 'Motorcycles', color: 'bg-[hsl(var(--chart-purple))]' },
+  bike: { icon: '🏍️', label: 'Motorcycles', color: 'bg-[hsl(var(--chart-purple))]' },
   bicycle: { icon: '🚲', label: 'Bicycles', color: 'bg-muted-foreground' },
   emergency: { icon: '🚑', label: 'Emergency', color: 'bg-destructive' },
+  ambulance: { icon: '🚑', label: 'Ambulances', color: 'bg-destructive' },
+  'fire truck': { icon: '🚒', label: 'Fire Trucks', color: 'bg-destructive' },
+  pedestrian: { icon: '🚶', label: 'Pedestrians', color: 'bg-indigo-500' },
+  'police vehicle': { icon: '🚓', label: 'Police Vehicles', color: 'bg-blue-600' },
+  animal: { icon: '🐕', label: 'Animals', color: 'bg-amber-600' },
+  'traffic cone': { icon: '🚧', label: 'Traffic Cones', color: 'bg-orange-500' },
+  'traffic light': { icon: '🚦', label: 'Traffic Lights', color: 'bg-green-500' },
+  'road block': { icon: '🛑', label: 'Road Blocks', color: 'bg-red-600' },
 };
 
 const VehicleClassification = ({ distribution, averageSpeed }: VehicleClassificationProps) => {
@@ -43,7 +52,7 @@ const VehicleClassification = ({ distribution, averageSpeed }: VehicleClassifica
       {/* Distribution */}
       <div className="space-y-2.5">
         {sorted.map(([type, count]) => {
-          const info = typeLabels[type];
+          const info = typeLabels[type] || { icon: '🚗', label: type, color: 'bg-primary' };
           const pct = total > 0 ? Math.round((count / total) * 100) : 0;
           return (
             <div key={type}>

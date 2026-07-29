@@ -11,14 +11,14 @@ from backend.app.core.database import SessionLocal
 from backend.app.db.models import Junction, Lane as LaneModel, Detection, Anomaly, EmergencyLog, TrafficPattern
 from backend.app.services.redis_service import redis_service
 from backend.app.services.ml_service import MLService
-from backend.app.services.cv_service import cv_service
 from backend.app.core.database import get_db
 from backend.app.services.prediction_ai import prediction_ai
 from backend.app.services.dataset_exporter import dataset_exporter
 from backend.app.services.congestion_predictor import congestion_predictor
 from backend.app.services.signal_controller import (
     SignalController, VehicleCounter, TimingEngine,
-    calculate_wait_time, calculate_throughput, calculate_congestion_level
+    calculate_wait_time, calculate_throughput, calculate_congestion_level,
+    FIXED_GREEN_DURATION, FIXED_CYCLE_DURATION
 )
 
 logger = logging.getLogger(__name__)
@@ -178,6 +178,7 @@ class SimulationManager:
         self.emergency_lane = None
         self.emergency_duration = 0
         self.weather = "clear"
+        self.active_camera_id = None
         
         # State caches
         self.intersections = []
@@ -407,6 +408,7 @@ class SimulationManager:
             db.close()
 
     async def _simulation_loop(self):
+        import random
         while True:
             try:
                 await asyncio.sleep(1.0)
@@ -518,6 +520,7 @@ class SimulationManager:
 
                 # 4. YOLOv11 Computer Vision Detections (every 3 seconds)
                 if self.elapsed_seconds % 3 == 0:
+                    from backend.app.services.cv_service import cv_service
                     cv_result = cv_service.process_frame(None, "int-1")
                     all_detections = cv_result["detections"]
                     
@@ -631,12 +634,70 @@ class SimulationManager:
         finally:
             db.close()
 
+    def sync_camera_telemetry(self, detections: List[Dict[str, Any]], lane_metrics: Dict[str, Any]):
+        """Syncs the real-time YOLO tracking results into the first junction (Junction 1)."""
+        if not self.intersections:
+            return
+            
+        junction = self.intersections[0]
+        # Update each lane's vehicle count, speed, and queue length
+        for lane in junction["lanes"]:
+            metrics = lane_metrics.get(lane["id"])
+            if metrics:
+                lane["vehicleCount"] = metrics["vehicleCount"]
+                lane["queueLength"] = metrics["queueLength"]
+                lane["averageSpeed"] = metrics["averageSpeed"]
+                lane["isCongested"] = metrics["queueLength"] > 15
+                lane["isBlocked"] = metrics["averageSpeed"] < 5.0 and metrics["vehicleCount"] > 3
+                
+        # Also sync current detections and anomalies to the global caches
+        self.detections = (self.detections[-50:] + detections)[-50:]
+        
+        # Check for emergency vehicles in detections
+        emergency_vehicles = [d for d in detections if d["vehicleType"] in ["emergency", "ambulance", "fire truck"]]
+        if emergency_vehicles:
+            # Trigger emergency override on the lane where emergency vehicle was detected
+            self.trigger_emergency_override(emergency_vehicles[0]["laneId"])
+            
+        # Recalculate average speed across all detections
+        if detections:
+            self.average_speed = round(sum(d["speed"] for d in detections) / len(detections), 1)
+            # Recompute vehicle type distribution
+            dist = {"car": 0, "truck": 0, "bus": 0, "motorcycle": 0, "bicycle": 0, "emergency": 0}
+            for d in detections:
+                vtype = d["vehicleType"]
+                if vtype in ["ambulance", "fire truck"]:
+                    dist["emergency"] = dist.get("emergency", 0) + 1
+                elif vtype == "bike":
+                    dist["motorcycle"] = dist.get("motorcycle", 0) + 1
+                elif vtype in dist:
+                    dist[vtype] = dist.get(vtype, 0) + 1
+            self.vehicle_distribution = dist
+
     def get_current_state_payload(self) -> Dict[str, Any]:
         """Shape the payload to exactly match React SimulationState."""
-        junction_summaries = [
-            get_junction_summary(int_s, self.metrics[idx])
-            for idx, int_s in enumerate(self.intersections)
-        ]
+        junction_summaries = []
+        for idx, int_s in enumerate(self.intersections):
+            if idx < len(self.metrics):
+                junction_summaries.append(get_junction_summary(int_s, self.metrics[idx]))
+        
+        # Get active camera runner stats
+        fps = 0.0
+        latency = 0.0
+        cpu = 0.0
+        gpu = 0.0
+        
+        if self.active_camera_id:
+            try:
+                from backend.app.services.camera_manager import camera_manager
+                runner = camera_manager.get_runner(self.active_camera_id)
+                if runner and runner.is_running:
+                    fps = runner.fps
+                    latency = runner.latency_ms
+                    cpu = runner.cpu_usage
+                    gpu = runner.gpu_usage
+            except Exception as e:
+                logger.error(f"Failed to fetch camera runner stats: {e}")
         
         from backend.app.services.rl_controller import rl_controller
         return {
@@ -664,7 +725,14 @@ class SimulationManager:
             "rlMode": rl_controller.use_rl_mode,
             "carbonCO2": round(self.carbon_co2, 2),
             "carbonCO": round(self.carbon_co, 2),
-            "carbonNOx": round(self.carbon_nox, 2)
+            "carbonNOx": round(self.carbon_nox, 2),
+            "activeCameraId": self.active_camera_id,
+            "cameraStats": {
+                "fps": round(fps, 1),
+                "latencyMs": round(latency, 1),
+                "cpuUsage": round(cpu, 1),
+                "gpuUsage": round(gpu, 1)
+            }
         }
 
 simulation_manager = SimulationManager()

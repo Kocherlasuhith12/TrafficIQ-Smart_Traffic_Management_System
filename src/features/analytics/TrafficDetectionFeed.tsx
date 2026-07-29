@@ -6,7 +6,21 @@ interface TrafficDetectionFeedProps {
 }
 
 const vehicleEmoji: Record<VehicleType, string> = {
-  car: '🚗', truck: '🚛', bus: '🚌', motorcycle: '🏍️', bicycle: '🚲', emergency: '🚑',
+  car: '🚗',
+  truck: '🚛',
+  bus: '🚌',
+  motorcycle: '🏍️',
+  bicycle: '🚲',
+  emergency: '🚑',
+  bike: '🏍️',
+  pedestrian: '🚶',
+  ambulance: '🚑',
+  'fire truck': '🚒',
+  'police vehicle': '🚓',
+  animal: '🐕',
+  'traffic cone': '🚧',
+  'traffic light': '🚦',
+  'road block': '🛑',
 };
 
 const severityColor: Record<string, string> = {

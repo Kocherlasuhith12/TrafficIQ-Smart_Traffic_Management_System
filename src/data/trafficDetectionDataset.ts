@@ -1,10 +1,26 @@
 // ─── Traffic Detection Dataset ───
 // Simulated CCTV/sensor detection data for ML training and real-time display.
 
-export type VehicleType = 'car' | 'truck' | 'bus' | 'motorcycle' | 'bicycle' | 'emergency';
+export type VehicleType = 
+  | 'car' 
+  | 'truck' 
+  | 'bus' 
+  | 'motorcycle' 
+  | 'bicycle' 
+  | 'emergency' 
+  | 'bike' 
+  | 'pedestrian' 
+  | 'ambulance' 
+  | 'fire truck'
+  | 'police vehicle'
+  | 'animal'
+  | 'traffic cone'
+  | 'traffic light'
+  | 'road block';
 
 export interface DetectionEvent {
   id: string;
+  trackId: number; // Unique tracking ID for ByteTrack/DeepSORT
   timestamp: number;
   laneId: string;
   vehicleType: VehicleType;
@@ -28,17 +44,27 @@ export interface AnomalyRecord {
   id: string;
   timestamp: number;
   laneId: string;
-  type: 'wrong_way' | 'stopped_vehicle' | 'overspeeding' | 'emergency_vehicle' | 'sudden_congestion' | 'accident_risk';
+  type: string; // incident type
   severity: 'low' | 'medium' | 'high' | 'critical';
   description: string;
   resolved: boolean;
+  cameraId?: string;
+  location?: string;
+  screenshotPath?: string;
 }
 
-const VEHICLE_TYPES: VehicleType[] = ['car', 'car', 'car', 'car', 'truck', 'bus', 'motorcycle', 'bicycle'];
+const VEHICLE_TYPES: VehicleType[] = [
+  'car', 'car', 'car', 'car',
+  'truck', 'bus', 'motorcycle', 'bicycle',
+  'pedestrian', 'ambulance', 'fire truck',
+  'police vehicle', 'animal', 'traffic cone',
+  'traffic light', 'road block'
+];
 const LANES = ['lane-N', 'lane-S', 'lane-E', 'lane-W'];
 
 let detectionIdCounter = 0;
 let anomalyIdCounter = 0;
+let trackIdCounter = 1000;
 
 /**
  * Generate a batch of simulated detection events (as if from CCTV/YOLO).
@@ -49,11 +75,72 @@ export const generateDetectionBatch = (laneId: string, vehicleCount: number): De
 
   for (let i = 0; i < vehicleCount; i++) {
     const isEmergency = Math.random() < 0.02;
-    const vehicleType: VehicleType = isEmergency ? 'emergency' : VEHICLE_TYPES[Math.floor(Math.random() * VEHICLE_TYPES.length)];
-    const baseSpeed = vehicleType === 'truck' ? 30 : vehicleType === 'bus' ? 25 : vehicleType === 'motorcycle' ? 45 : 35;
+    const vehicleType: VehicleType = isEmergency 
+      ? (Math.random() < 0.5 ? 'ambulance' : 'fire truck') 
+      : VEHICLE_TYPES[Math.floor(Math.random() * VEHICLE_TYPES.length)];
+      
+    let baseSpeed = 35;
+    let w = 80;
+    let h = 40;
+
+    switch (vehicleType) {
+      case 'truck':
+        baseSpeed = 25;
+        w = 120;
+        h = 55;
+        break;
+      case 'bus':
+        baseSpeed = 20;
+        w = 130;
+        h = 60;
+        break;
+      case 'motorcycle':
+      case 'bike':
+        baseSpeed = 45;
+        w = 50;
+        h = 30;
+        break;
+      case 'bicycle':
+        baseSpeed = 15;
+        w = 40;
+        h = 25;
+        break;
+      case 'pedestrian':
+        baseSpeed = 4;
+        w = 30;
+        h = 30;
+        break;
+      case 'ambulance':
+      case 'fire truck':
+      case 'police vehicle':
+        baseSpeed = 55;
+        w = 90;
+        h = 45;
+        break;
+      case 'animal':
+        baseSpeed = 8;
+        w = 45;
+        h = 35;
+        break;
+      case 'traffic cone':
+      case 'traffic light':
+      case 'road block':
+        baseSpeed = 0; // Stationary
+        w = 25;
+        h = 35;
+        if (vehicleType === 'road block') {
+          w = 70;
+          h = 30;
+        }
+        break;
+      default:
+        baseSpeed = 35;
+        break;
+    }
 
     events.push({
       id: `det-${++detectionIdCounter}`,
+      trackId: ++trackIdCounter,
       timestamp: now - Math.floor(Math.random() * 5000),
       laneId,
       vehicleType,
@@ -63,8 +150,8 @@ export const generateDetectionBatch = (laneId: string, vehicleCount: number): De
       boundingBox: {
         x: Math.floor(Math.random() * 800),
         y: Math.floor(Math.random() * 600),
-        w: vehicleType === 'truck' || vehicleType === 'bus' ? 120 : 80,
-        h: vehicleType === 'truck' || vehicleType === 'bus' ? 60 : 40,
+        w,
+        h,
       },
     });
   }
@@ -112,7 +199,7 @@ export const detectAnomalies = (detections: DetectionEvent[], laneId: string): A
   const now = Date.now();
 
   // Emergency vehicle detection
-  const emergencies = detections.filter(d => d.vehicleType === 'emergency');
+  const emergencies = detections.filter(d => d.vehicleType === 'emergency' || d.vehicleType === 'ambulance' || d.vehicleType === 'fire truck');
   if (emergencies.length > 0) {
     anomalies.push({
       id: `anom-${++anomalyIdCounter}`,
@@ -122,6 +209,9 @@ export const detectAnomalies = (detections: DetectionEvent[], laneId: string): A
       severity: 'critical',
       description: `Emergency vehicle detected on ${laneId}. Priority signal recommended.`,
       resolved: false,
+      cameraId: `CAM-01`,
+      location: `${laneId.replace('lane-', 'Lane ')}`,
+      screenshotPath: `/api/v1/incidents/screenshot/anom-${anomalyIdCounter}`
     });
   }
 
@@ -136,6 +226,9 @@ export const detectAnomalies = (detections: DetectionEvent[], laneId: string): A
       severity: 'medium',
       description: `${speeders.length} vehicle(s) exceeding speed limit on ${laneId}.`,
       resolved: false,
+      cameraId: `CAM-02`,
+      location: `${laneId.replace('lane-', 'Lane ')}`,
+      screenshotPath: `/api/v1/incidents/screenshot/anom-${anomalyIdCounter}`
     });
   }
 
@@ -149,32 +242,82 @@ export const detectAnomalies = (detections: DetectionEvent[], laneId: string): A
       severity: 'high',
       description: `Sudden congestion spike: ${detections.length} vehicles on ${laneId}.`,
       resolved: false,
+      cameraId: `CAM-03`,
+      location: `${laneId.replace('lane-', 'Lane ')}`,
+      screenshotPath: `/api/v1/incidents/screenshot/anom-${anomalyIdCounter}`
     });
   }
 
-  // Stopped vehicle
+  // Stopped vehicle / Breakdown
   const stopped = detections.filter(d => d.speed < 3);
   if (stopped.length >= 2) {
     anomalies.push({
       id: `anom-${++anomalyIdCounter}`,
       timestamp: now,
       laneId,
-      type: 'stopped_vehicle',
+      type: 'vehicle_breakdown',
       severity: 'medium',
       description: `${stopped.length} stopped vehicle(s) detected on ${laneId}. Possible breakdown.`,
       resolved: false,
+      cameraId: `CAM-04`,
+      location: `${laneId.replace('lane-', 'Lane ')}`,
+      screenshotPath: `/api/v1/incidents/screenshot/anom-${anomalyIdCounter}`
+    });
+  }
+
+  // Simulated major incidents (Phase 9)
+  if (Math.random() < 0.04) {
+    const majorIncidents = [
+      { type: 'accident', severity: 'critical' as const, description: 'Accident: Multiple vehicle collision' },
+      { type: 'vehicle_collision', severity: 'critical' as const, description: 'Collision: Secondary impact crash' },
+      { type: 'wrong_way_driving', severity: 'critical' as const, description: 'Wrong-way Driving: Vehicle traveling opposite direction' },
+      { type: 'illegal_parking', severity: 'medium' as const, description: 'Illegal Parking: Stalled delivery vehicle' },
+      { type: 'red_light_violation', severity: 'high' as const, description: 'Red Light Violation: Vehicle crossed limit line on RED' },
+      { type: 'road_block', severity: 'high' as const, description: 'Road Block: Visual debris/spill on lane' },
+      { type: 'fire', severity: 'critical' as const, description: 'Fire: Active engine/brush fire detected' },
+      { type: 'smoke', severity: 'high' as const, description: 'Smoke: Thick haze limiting visibility' },
+    ];
+    const item = majorIncidents[Math.floor(Math.random() * majorIncidents.length)];
+    anomalies.push({
+      id: `anom-${++anomalyIdCounter}`,
+      timestamp: now,
+      laneId,
+      type: item.type,
+      severity: item.severity,
+      description: `${item.description} on ${laneId}. Emergency services notified.`,
+      resolved: false,
+      cameraId: `CAM-0${Math.floor(Math.random() * 4) + 1}`,
+      location: `${laneId.replace('lane-', 'Lane ')}`,
+      screenshotPath: `/api/v1/incidents/screenshot/anom-${anomalyIdCounter}`
     });
   }
 
   return anomalies;
 };
 
-/**
- * Get vehicle type distribution from detections.
- */
 export const getVehicleTypeDistribution = (detections: DetectionEvent[]): Record<VehicleType, number> => {
-  const dist: Record<VehicleType, number> = { car: 0, truck: 0, bus: 0, motorcycle: 0, bicycle: 0, emergency: 0 };
-  detections.forEach(d => { dist[d.vehicleType]++; });
+  const dist: Record<VehicleType, number> = { 
+    car: 0, 
+    truck: 0, 
+    bus: 0, 
+    motorcycle: 0, 
+    bicycle: 0, 
+    emergency: 0,
+    bike: 0,
+    pedestrian: 0,
+    ambulance: 0,
+    'fire truck': 0,
+    'police vehicle': 0,
+    animal: 0,
+    'traffic cone': 0,
+    'traffic light': 0,
+    'road block': 0
+  };
+  detections.forEach(d => { 
+    if (dist[d.vehicleType] !== undefined) {
+      dist[d.vehicleType]++; 
+    }
+  });
   return dist;
 };
 

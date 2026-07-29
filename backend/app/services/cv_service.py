@@ -35,9 +35,10 @@ class CVService:
         self.model = None
         self.initialized = False
         self.coco_classes = {
+            0: "pedestrian",
             1: "bicycle",
             2: "car",
-            3: "motorcycle",
+            3: "bike",
             5: "bus",
             7: "truck"
         }
@@ -215,10 +216,18 @@ class CVService:
                         if smoothed_speed < 3.0:
                             track["wait_time_sec"] += dt
                             
-                        # Vehicle Type overrides for emergency designations
-                        if vehicle_type in ["car", "bus"] and random.random() < 0.02:
-                            vehicle_type = "emergency"
-                            track["vehicle_type"] = "emergency"
+                        # Vehicle Type overrides for emergency designations (including ambulance and fire truck)
+                        if vehicle_type in ["car", "bus", "truck"]:
+                            rand_val = random.random()
+                            if rand_val < 0.02:
+                                vehicle_type = "ambulance"
+                                track["vehicle_type"] = "ambulance"
+                            elif rand_val < 0.04:
+                                vehicle_type = "fire truck"
+                                track["vehicle_type"] = "fire truck"
+                            elif rand_val < 0.05:
+                                vehicle_type = "emergency"
+                                track["vehicle_type"] = "emergency"
                             
                         # Wrong-way driving check
                         is_wrong_way = False
@@ -250,7 +259,7 @@ class CVService:
                         # ANPR License Plate Generation (deterministic hash)
                         dir_code = matched_lane[-1].upper()
                         plate = f"US-{dir_code}-{track_id % 10000:04d}"
-
+ 
                         # Add to frame detections
                         self.detection_counter += 1
                         current_detections.append({
@@ -260,7 +269,7 @@ class CVService:
                             "vehicleType": vehicle_type,
                             "speed": track["smoothed_speed"],
                             "confidence": round(confidence, 2),
-                            "isAnomaly": vehicle_type == "emergency" or track["smoothed_speed"] > 55 or is_wrong_way or is_red_violation or is_illegal_parking,
+                            "isAnomaly": vehicle_type in ["emergency", "ambulance", "fire truck"] or track["smoothed_speed"] > 55 or is_wrong_way or is_red_violation or is_illegal_parking,
                             "boundingBox": {"x": x1, "y": y1, "w": w, "h": h},
                             "trackId": track_id,
                             "distanceTravelled": round(track["distance_travelled"], 1),
@@ -272,6 +281,23 @@ class CVService:
                             "xWorld": round(x_world, 2),
                             "yWorld": round(y_world, 2)
                         })
+
+                        # Draw bounding box and labels on the image in-place if it's a numpy array
+                        if isinstance(frame_path_or_ndarray, np.ndarray):
+                            color = (0, 255, 0) # Green for normal
+                            if vehicle_type in ["emergency", "ambulance", "fire truck"]:
+                                color = (0, 0, 255) # Red for emergency/ambulance/fire truck
+                            elif is_wrong_way or is_red_violation or is_illegal_parking:
+                                color = (0, 0, 255) # Red for traffic violations
+                            elif track["smoothed_speed"] > 55:
+                                color = (0, 165, 255) # Orange for speeding
+                            
+                            # Draw box
+                            cv2.rectangle(frame_path_or_ndarray, (x1, y1), (x2, y2), color, 2)
+                            # Draw label
+                            label_str = f"{vehicle_type.upper()} {confidence*100:.0f}% ID:{track_id}"
+                            cv2.putText(frame_path_or_ndarray, label_str, (x1, max(15, y1 - 5)),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1)
                         
                         lane_counts[matched_lane] += 1
                         lane_speeds[matched_lane].append(track["smoothed_speed"])
@@ -518,113 +544,207 @@ class CVService:
         anomalies = []
         now_ms = int(time.time() * 1000)
         
-        lane_counts = {}
+        lane_counts: Dict[str, int] = {}
+        stopped_per_lane: Dict[str, int] = {}
+        pedestrian_per_lane: Dict[str, int] = {}
+
         for d in detections:
             lane_id = d["laneId"]
             lane_counts[lane_id] = lane_counts.get(lane_id, 0) + 1
-            
+            if d.get("speed", 99) < 3:
+                stopped_per_lane[lane_id] = stopped_per_lane.get(lane_id, 0) + 1
+            if d.get("vehicleType") == "pedestrian":
+                pedestrian_per_lane[lane_id] = pedestrian_per_lane.get(lane_id, 0) + 1
+
         for d in detections:
             lane_id = d["laneId"]
-            
-            # Wrong Way Alert
-            if d.get("isWrongWay"):
-                anomalies.append({
-                    "id": f"anom-{uuid.uuid4().hex[:6]}",
-                    "timestamp": now_ms,
-                    "laneId": lane_id,
-                    "type": "wrong_way_driving",
-                    "severity": "critical",
-                    "description": f"Wrong-way driver detected on {lane_id} (Plate: {d.get('licensePlate')})!",
-                    "resolved": False
-                })
-                
-            # Red Light Violation Alert
-            if d.get("isRedViolation"):
-                anomalies.append({
-                    "id": f"anom-{uuid.uuid4().hex[:6]}",
-                    "timestamp": now_ms,
-                    "laneId": lane_id,
-                    "type": "red_light_violation",
-                    "severity": "high",
-                    "description": f"Red-light crossing violation by vehicle {d.get('licensePlate')} on {lane_id}!",
-                    "resolved": False
-                })
-                
-            # Illegal Parking Alert
-            if d.get("isIllegalParking"):
-                anomalies.append({
-                    "id": f"anom-{uuid.uuid4().hex[:6]}",
-                    "timestamp": now_ms,
-                    "laneId": lane_id,
-                    "type": "illegal_parking",
-                    "severity": "medium",
-                    "description": f"Vehicle {d.get('licensePlate')} parked illegally in the shoulder of {lane_id} for over 30s.",
-                    "resolved": False
-                })
 
-            # Emergency Vehicle Alert
-            if d["vehicleType"] == "emergency":
-                anomalies.append({
-                    "id": f"anom-{uuid.uuid4().hex[:6]}",
-                    "timestamp": now_ms,
-                    "laneId": lane_id,
-                    "type": "emergency_vehicle",
-                    "severity": "critical",
-                    "description": f"Emergency vehicle (ID: {d.get('trackId', 'N/A')}) detected on {lane_id}. Priority signal activated.",
-                    "resolved": False
-                })
-                
-            # Overspeeding Alert (Instant speed > 55 km/h)
-            elif d["speed"] > 55.0:
-                anomalies.append({
-                    "id": f"anom-{uuid.uuid4().hex[:6]}",
-                    "timestamp": now_ms,
-                    "laneId": lane_id,
-                    "type": "overspeeding",
-                    "severity": "medium",
-                    "description": f"Vehicle track {d.get('trackId')} exceeding speed limit ({d['speed']} km/h) on {lane_id}.",
-                    "resolved": False
-                })
-                
-            # Breakdown Alert (Wait time in active lane exceeds 30 seconds)
-            elif d.get("waitTime", 0.0) > 30.0:
-                anomalies.append({
-                    "id": f"anom-{uuid.uuid4().hex[:6]}",
-                    "timestamp": now_ms,
-                    "laneId": lane_id,
-                    "type": "stopped_vehicle",
-                    "severity": "high",
-                    "description": f"Vehicle breakdown alert: Track {d.get('trackId')} stopped for over 30s on {lane_id}.",
-                    "resolved": False
-                })
-                
-        # Lane Congestion Alert
+            # ── 1. Wrong-Way Driving ─────────────────────────────────────────────────
+            if d.get("isWrongWay"):
+                anomalies.append(self._make_incident(
+                    now_ms, lane_id, "wrong_way_driving", "critical",
+                    f"⚠️ Wrong-way driver detected on {lane_id}! Plate: {d.get('licensePlate', 'N/A')}"
+                ))
+
+            # ── 2. Red Light Violation ───────────────────────────────────────────────
+            if d.get("isRedViolation"):
+                anomalies.append(self._make_incident(
+                    now_ms, lane_id, "red_light_violation", "high",
+                    f"🚦 Red-light violation by {d.get('licensePlate', 'Track-' + str(d.get('trackId', '?')))} on {lane_id}!"
+                ))
+
+            # ── 3. Illegal Parking ───────────────────────────────────────────────────
+            if d.get("isIllegalParking"):
+                anomalies.append(self._make_incident(
+                    now_ms, lane_id, "illegal_parking", "medium",
+                    f"🚫 Illegal parking by {d.get('licensePlate', 'unknown')} on shoulder of {lane_id} (>30s)."
+                ))
+
+            # ── 4. Emergency / Ambulance / Fire Truck ────────────────────────────────
+            if d.get("vehicleType") in ("emergency", "ambulance", "fire truck"):
+                anomalies.append(self._make_incident(
+                    now_ms, lane_id, "emergency_vehicle", "critical",
+                    f"🚑 Emergency vehicle [{d.get('vehicleType', 'emergency').upper()}] on {lane_id}. Priority signal activated."
+                ))
+
+            # ── 5. Overspeeding ──────────────────────────────────────────────────────
+            elif d.get("speed", 0) > 55.0 and d.get("vehicleType") not in ("emergency", "ambulance"):
+                anomalies.append(self._make_incident(
+                    now_ms, lane_id, "overspeeding", "medium",
+                    f"💨 Overspeeding: Track {d.get('trackId', '?')} at {d.get('speed', 0):.1f} km/h on {lane_id}."
+                ))
+
+            # ── 6. Vehicle Breakdown (long wait time) ────────────────────────────────
+            elif d.get("waitTime", 0.0) > 45.0 and d.get("speed", 99) < 5:
+                anomalies.append(self._make_incident(
+                    now_ms, lane_id, "vehicle_breakdown", "high",
+                    f"🔧 Breakdown: Track {d.get('trackId', '?')} stopped for {d.get('waitTime', 0):.0f}s on {lane_id}."
+                ))
+
+        # ── 7. Vehicle Stopped / Collision Heuristic ──────────────────────────────
+        for lane_id, stopped in stopped_per_lane.items():
+            if stopped >= 2:
+                # Two or more vehicles at standstill → possible collision
+                anomalies.append(self._make_incident(
+                    now_ms, lane_id, "vehicle_collision", "critical",
+                    f"💥 Possible collision: {stopped} vehicles stationary on {lane_id}. Immediate response required."
+                ))
+            elif stopped == 1:
+                anomalies.append(self._make_incident(
+                    now_ms, lane_id, "vehicle_stopped", "medium",
+                    f"🛑 Stopped vehicle detected in active lane {lane_id}. Possible breakdown or obstruction."
+                ))
+
+        # ── 8. Pedestrian on Road ─────────────────────────────────────────────────
+        for lane_id, ped_count in pedestrian_per_lane.items():
+            if ped_count > 0:
+                anomalies.append(self._make_incident(
+                    now_ms, lane_id, "pedestrian_on_road", "high",
+                    f"🚶 {ped_count} pedestrian(s) detected in active vehicle lane {lane_id}!"
+                ))
+
+        # ── 9. Road Block (heavy congestion at green signal) ──────────────────────
         for lane_id, count in lane_counts.items():
             if count > 20:
-                anomalies.append({
-                    "id": f"anom-{uuid.uuid4().hex[:6]}",
-                    "timestamp": now_ms,
-                    "laneId": lane_id,
-                    "type": "sudden_congestion",
-                    "severity": "high",
-                    "description": f"Lane congestion spike: {count} vehicles detected in {lane_id}.",
-                    "resolved": False
-                })
+                anomalies.append(self._make_incident(
+                    now_ms, lane_id, "sudden_congestion", "high",
+                    f"🚧 Congestion spike: {count} vehicles in {lane_id}. Possible road block."
+                ))
+            if count > 28:
+                anomalies.append(self._make_incident(
+                    now_ms, lane_id, "road_block", "critical",
+                    f"🚧 Full road block detected on {lane_id}! {count} vehicles unable to move."
+                ))
 
-        # AI Confidence tracking
+        # ── 10–12. Environmental / Rare Incidents (Probabilistic Injection) ───────
+        # These represent rare real-world events like fire, smoke, flooding, animal crossings.
+        # In simulation mode they are injected randomly with very low probability.
+        rand = random.random()
+        if rand < 0.0008:
+            lane_id = random.choice(["lane-N", "lane-S", "lane-E", "lane-W"])
+            anomalies.append(self._make_incident(
+                now_ms, lane_id, "fire", "critical",
+                f"🔥 FIRE detected near {lane_id}! Emergency services dispatched."
+            ))
+        elif rand < 0.0015:
+            lane_id = random.choice(["lane-N", "lane-S", "lane-E", "lane-W"])
+            anomalies.append(self._make_incident(
+                now_ms, lane_id, "smoke", "high",
+                f"💨 Smoke/haze detected in camera zone covering {lane_id}. Visibility impaired."
+            ))
+        elif rand < 0.002:
+            lane_id = random.choice(["lane-N", "lane-S", "lane-E", "lane-W"])
+            anomalies.append(self._make_incident(
+                now_ms, lane_id, "flooding", "high",
+                f"🌊 Flooding detected on {lane_id}. Road surface submerged. Divert traffic."
+            ))
+        elif rand < 0.0025:
+            lane_id = random.choice(["lane-N", "lane-S", "lane-E", "lane-W"])
+            anomalies.append(self._make_incident(
+                now_ms, lane_id, "animal_crossing", "medium",
+                f"🦌 Animal crossing detected on {lane_id}. Slow vehicles warned."
+            ))
+        elif rand < 0.003:
+            lane_id = random.choice(["lane-N", "lane-S", "lane-E", "lane-W"])
+            anomalies.append(self._make_incident(
+                now_ms, lane_id, "accident", "critical",
+                f"🚗💥 Road accident reported at {lane_id} / {junction_name}. First responders notified."
+            ))
+
+        # ── AI Confidence Alert ───────────────────────────────────────────────────
         if detections:
             avg_conf = sum(d.get("confidence", 1.0) for d in detections) / len(detections)
             if avg_conf < 0.60:
-                anomalies.append({
-                    "id": f"anom-{uuid.uuid4().hex[:6]}",
-                    "timestamp": now_ms,
-                    "laneId": "all",
-                    "type": "low_confidence_alert",
-                    "severity": "low",
-                    "description": f"AI model confidence average dropped to {avg_conf:.2f}. Sensor checks recommended.",
-                    "resolved": False
-                })
-                
+                anomalies.append(self._make_incident(
+                    now_ms, "all", "low_confidence_alert", "low",
+                    f"⚠️ AI confidence dropped to {avg_conf:.2f}. Sensor check recommended."
+                ))
+
         return anomalies
 
+    def _make_incident(self, timestamp_ms: int, lane_id: str, inc_type: str, severity: str, description: str) -> Dict[str, Any]:
+        """Create a standardized incident/anomaly dict with a unique ID and screenshot path."""
+        anom_id = f"anom-{uuid.uuid4().hex[:8]}"
+        return {
+            "id": anom_id,
+            "timestamp": timestamp_ms,
+            "laneId": lane_id,
+            "type": inc_type,
+            "severity": severity,
+            "description": description,
+            "resolved": False,
+            "screenshotPath": f"/api/v1/incidents/screenshot/{anom_id}",
+        }
+
+    def capture_screenshot(self, anomaly_id: str, active_camera_id: Optional[str] = None) -> Optional[str]:
+        """
+        Saves the current CCTV frame to disk for a given anomaly ID.
+        Falls back to generating a synthetic annotated frame if no live camera feed is available.
+        Returns the absolute file path of the saved screenshot, or None on failure.
+        """
+        try:
+            screenshots_dir = os.path.join(os.path.dirname(__file__), "..", "..", "..", "data", "screenshots")
+            os.makedirs(screenshots_dir, exist_ok=True)
+            out_path = os.path.join(screenshots_dir, f"{anomaly_id}.jpg")
+
+            # Try to get latest JPEG bytes from the active camera runner
+            if active_camera_id:
+                try:
+                    from backend.app.services.camera_manager import camera_manager
+                    runner = camera_manager.get_runner(active_camera_id)
+                    if runner and runner.latest_frame:
+                        with open(out_path, "wb") as f:
+                            f.write(runner.latest_frame)
+                        logger.info(f"Screenshot saved from live camera: {out_path}")
+                        return out_path
+                except Exception as e:
+                    logger.warning(f"Could not capture from camera runner: {e}")
+
+            # Fallback: Generate a synthetic CCTV-style frame
+            frame = np.zeros((480, 640, 3), dtype=np.uint8)
+            frame[:] = (20, 20, 30)  # dark background
+            cv2.rectangle(frame, (0, 0), (640, 480), (0, 100, 0), 3)
+            timestamp_str = time.strftime("%Y-%m-%d %H:%M:%S")
+            cv2.putText(frame, f"INCIDENT DETECTED", (30, 60), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), 2)
+            cv2.putText(frame, f"ID: {anomaly_id}", (30, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1)
+            cv2.putText(frame, f"TS: {timestamp_str}", (30, 130), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (180, 180, 180), 1)
+            cv2.putText(frame, "TrafficIQ CCTV Monitor", (30, 460), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (100, 200, 100), 1)
+            # Draw fake lane overlay lines
+            cv2.line(frame, (213, 0), (213, 480), (80, 80, 80), 1)
+            cv2.line(frame, (426, 0), (426, 480), (80, 80, 80), 1)
+            cv2.putText(frame, "Lane N", (50, 240), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (120, 120, 120), 1)
+            cv2.putText(frame, "Lane E", (270, 240), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (120, 120, 120), 1)
+            cv2.putText(frame, "Lane W", (460, 240), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (120, 120, 120), 1)
+
+            ret, buffer = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+            if ret:
+                with open(out_path, "wb") as f:
+                    f.write(buffer.tobytes())
+                logger.info(f"Synthetic screenshot saved: {out_path}")
+                return out_path
+        except Exception as e:
+            logger.error(f"Screenshot capture failed: {e}")
+        return None
+
 cv_service = CVService()
+

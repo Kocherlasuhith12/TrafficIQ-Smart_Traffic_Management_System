@@ -1,7 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, Body
+from fastapi import APIRouter, Depends, HTTPException, Body, File, UploadFile
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any
 from datetime import datetime, timedelta
+import os
 
 from backend.app.core.database import get_db
 from backend.app.db.models import Detection, Anomaly, EmergencyLog
@@ -145,4 +147,143 @@ def recommend_route(origin: str, destination: str):
     return result
 
 
+# ─── Camera Management Endpoints ───
 
+@router.get("/cameras")
+def list_cameras():
+    """List all available camera sources."""
+    from backend.app.services.camera_manager import camera_manager
+    return camera_manager.get_all_cameras()
+
+
+@router.post("/cameras")
+def add_camera(payload: Dict[str, Any] = Body(...)):
+    """Add a new camera source."""
+    from backend.app.services.camera_manager import camera_manager
+    name = payload.get("name")
+    type_str = payload.get("type")
+    source = payload.get("source")
+    if not name or not type_str or not source:
+        raise HTTPException(status_code=400, detail="Missing required camera fields (name, type, source)")
+    return camera_manager.add_camera(name, type_str, source)
+
+
+@router.delete("/cameras/{cam_id}")
+def delete_camera(cam_id: str):
+    """Remove a camera source."""
+    from backend.app.services.camera_manager import camera_manager
+    camera_manager.delete_camera(cam_id)
+    return {"status": "success"}
+
+
+@router.post("/cameras/{cam_id}/start")
+def start_camera(cam_id: str):
+    """Start processing a camera feed."""
+    from backend.app.services.camera_manager import camera_manager
+    success = camera_manager.start_camera(cam_id)
+    if not success:
+        raise HTTPException(status_code=404, detail=f"Camera {cam_id} not found or failed to start")
+    return {"status": "success"}
+
+
+@router.post("/cameras/{cam_id}/stop")
+def stop_camera(cam_id: str):
+    """Stop processing a camera feed."""
+    from backend.app.services.camera_manager import camera_manager
+    success = camera_manager.stop_camera(cam_id)
+    if not success:
+        raise HTTPException(status_code=404, detail=f"Camera {cam_id} is not running or not found")
+    return {"status": "success"}
+
+
+@router.post("/cameras/{cam_id}/active")
+def set_active_camera(cam_id: str):
+    """Set the camera source to feed real counts into the main simulation."""
+    from backend.app.services.camera_manager import camera_manager
+    if cam_id not in camera_manager.cameras:
+        raise HTTPException(status_code=404, detail=f"Camera {cam_id} not found")
+    simulation_manager.active_camera_id = cam_id
+    # Also start it automatically
+    camera_manager.start_camera(cam_id)
+    return {"status": "success", "activeCameraId": cam_id}
+
+
+@router.post("/cameras/upload")
+async def upload_video(file: UploadFile = File(...)):
+    """Upload a video file for traffic vision processing."""
+    os.makedirs("backend/data/uploads", exist_ok=True)
+    file_path = os.path.join("backend/data/uploads", file.filename)
+    try:
+        content = await file.read()
+        with open(file_path, "wb") as f:
+            f.write(content)
+        return {"status": "success", "file_path": file_path}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Video upload failed: {e}")
+
+
+@router.get("/cameras/{cam_id}/stream")
+def stream_camera(cam_id: str):
+    """MJPEG stream endpoint to render YOLO outputs dynamically in browser <img> tags."""
+    from backend.app.services.camera_manager import camera_manager
+    runner = camera_manager.get_runner(cam_id)
+    if not runner or not runner.is_running:
+        # Start automatically if it exists
+        if cam_id in camera_manager.cameras:
+            camera_manager.start_camera(cam_id)
+            runner = camera_manager.get_runner(cam_id)
+        else:
+            raise HTTPException(status_code=404, detail=f"Camera {cam_id} is not active or not found")
+            
+    # Yield the streaming response
+    return StreamingResponse(
+        runner.get_frame_stream(),
+        media_type="multipart/x-mixed-replace; boundary=frame"
+    )
+
+
+# ─── Phase 3: Incident Detection Endpoints ──────────────────────────────────────
+
+@router.get("/incidents/screenshot/{anomaly_id}")
+def get_incident_screenshot(anomaly_id: str):
+    """
+    Serve the JPEG screenshot for a given anomaly/incident.
+    If the file doesn't exist on disk yet, capture it on-demand.
+    """
+    import os
+    from fastapi.responses import FileResponse
+    from backend.app.services.cv_service import cv_service
+
+    base_dir = os.path.join(os.path.dirname(__file__), "..", "..", "..", "data", "screenshots")
+    file_path = os.path.join(base_dir, f"{anomaly_id}.jpg")
+
+    if not os.path.exists(file_path):
+        # Capture on-demand using active camera or synthetic fallback
+        result = cv_service.capture_screenshot(anomaly_id, simulation_manager.active_camera_id)
+        if not result:
+            raise HTTPException(status_code=404, detail=f"Screenshot for incident {anomaly_id} not found")
+        file_path = result
+
+    return FileResponse(
+        path=file_path,
+        media_type="image/jpeg",
+        headers={"Cache-Control": "no-cache"},
+    )
+
+
+@router.post("/incidents/{anomaly_id}/resolve")
+def resolve_incident(anomaly_id: str):
+    """
+    Mark an incident as resolved in the active simulation state.
+    """
+    resolved = False
+    for anomaly in simulation_manager.anomalies:
+        if anomaly.get("id") == anomaly_id:
+            anomaly["resolved"] = True
+            resolved = True
+            break
+
+    if not resolved:
+        raise HTTPException(status_code=404, detail=f"Incident {anomaly_id} not found")
+
+    return {"status": "resolved", "anomalyId": anomaly_id}

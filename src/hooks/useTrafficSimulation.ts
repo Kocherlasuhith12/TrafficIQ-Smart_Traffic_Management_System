@@ -18,6 +18,8 @@ import {
   VehicleType,
 } from '@/data/trafficDetectionDataset';
 
+export type WeatherCondition = 'clear' | 'rain' | 'fog' | 'night' | 'snow' | 'dust';
+
 export interface SimulationState {
   intersections: Intersection[];
   metrics: TrafficMetrics[];
@@ -38,6 +40,14 @@ export interface SimulationState {
   junctionSummaries: JunctionSummary[];
   trafficFlows: TrafficFlowMetrics[];
   emergencyLogs: EmergencyOverrideLog[];
+  activeCameraId?: string | null;
+  weatherCondition: WeatherCondition;
+  cameraStats?: {
+    fps: number;
+    latencyMs: number;
+    cpuUsage: number;
+    gpuUsage: number;
+  };
 }
 
 export const useTrafficSimulation = () => {
@@ -62,7 +72,23 @@ export const useTrafficSimulation = () => {
       detections: [],
       anomalies: [],
       trafficPatterns: patterns,
-      vehicleDistribution: { car: 0, truck: 0, bus: 0, motorcycle: 0, bicycle: 0, emergency: 0 },
+      vehicleDistribution: { 
+        car: 0, 
+        truck: 0, 
+        bus: 0, 
+        motorcycle: 0, 
+        bicycle: 0, 
+        emergency: 0,
+        bike: 0,
+        pedestrian: 0,
+        ambulance: 0,
+        'fire truck': 0,
+        'police vehicle': 0,
+        animal: 0,
+        'traffic cone': 0,
+        'traffic light': 0,
+        'road block': 0
+      },
       averageSpeed: 0,
       currentPattern: getCurrentPatternPrediction(patterns),
       emergencyActive: false,
@@ -70,6 +96,14 @@ export const useTrafficSimulation = () => {
       junctionSummaries: intersections.map((int, idx) => getJunctionSummary(int, metrics[idx])),
       trafficFlows: getTrafficFlowMetrics(intersections[0]),
       emergencyLogs: [],
+      activeCameraId: null,
+      weatherCondition: 'clear' as WeatherCondition,
+      cameraStats: {
+        fps: 0,
+        latencyMs: 0,
+        cpuUsage: 0,
+        gpuUsage: 0,
+      },
     };
   });
 
@@ -246,5 +280,13 @@ export const useTrafficSimulation = () => {
     }
   }, []);
 
-  return { ...state, toggleSimulation, setScenario };
+  const setWeather = useCallback((condition: WeatherCondition) => {
+    setState(prev => ({ ...prev, weatherCondition: condition }));
+  }, []);
+
+  const setActiveCameraId = useCallback((cameraId: string | null) => {
+    setState(prev => ({ ...prev, activeCameraId: cameraId }));
+  }, []);
+
+  return { ...state, toggleSimulation, setScenario, setWeather, setActiveCameraId };
 };

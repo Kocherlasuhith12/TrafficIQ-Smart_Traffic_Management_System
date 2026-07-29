@@ -10,9 +10,9 @@ try:
     import xgboost as xgb
     import shap
     XGB_AVAILABLE = True
-except ImportError:
+except (ImportError, Exception) as e:
     XGB_AVAILABLE = False
-    logging.warning("XGBoost or SHAP libraries not available. Running CongestionPredictor in high-fidelity mathematical mode.")
+    logging.warning(f"XGBoost or SHAP libraries not available or could not be loaded ({e}). Running CongestionPredictor in high-fidelity mathematical mode.")
 
 logger = logging.getLogger(__name__)
 

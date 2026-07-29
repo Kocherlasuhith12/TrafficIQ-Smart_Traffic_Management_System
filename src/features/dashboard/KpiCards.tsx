@@ -61,18 +61,24 @@ const KpiCards = ({ metrics, elapsedSeconds, junctionSummaries }: KpiCardsProps)
   ];
 
   const trendColor = (t?: string) => {
-    if (t === 'positive') return 'text-primary';
-    if (t === 'negative') return 'text-destructive';
-    return 'text-accent';
+    if (t === 'positive') return 'text-[#22c55e]';
+    if (t === 'negative') return 'text-[#ef4444]';
+    return 'text-[#f97316]';
+  };
+
+  const kpiBorder = (t?: string) => {
+    if (t === 'positive') return 'border-t-2 border-t-[#22c55e]/60 hover:shadow-[0_0_15px_rgba(34,197,94,0.06)]';
+    if (t === 'negative') return 'border-t-2 border-t-[#ef4444]/60 hover:shadow-[0_0_15px_rgba(239,68,68,0.06)]';
+    return 'border-t-2 border-t-[#f97316]/60 hover:shadow-[0_0_15px_rgba(249,115,22,0.06)]';
   };
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
       {kpis.map(kpi => (
-        <div key={kpi.label} className="kpi-card animate-fade-in">
+        <div key={kpi.label} className={`glass-card hover-card-trigger rounded-xl p-4 transition-all duration-300 animate-fade-in ${kpiBorder(kpi.trend)}`}>
           <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">{kpi.label}</p>
           <p className="text-2xl font-bold font-mono text-foreground">{kpi.value}</p>
-          <p className={`text-xs mt-1 ${trendColor(kpi.trend)}`}>{kpi.subtitle}</p>
+          <p className={`text-xs mt-1 font-medium ${trendColor(kpi.trend)}`}>{kpi.subtitle}</p>
         </div>
       ))}
     </div>
