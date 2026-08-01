@@ -1,104 +1,96 @@
-# 🚦 TrafficIQ — Intelligent Traffic Management System
+# TrafficIQ Hub
 
-### *Real-Time, ML-Powered Adaptive Signal Control Platform*
+**AI-powered smart traffic management system** — a real-time, multi-junction control dashboard that combines computer vision, forecasting, and a voice-controlled assistant to monitor and manage city traffic.
 
-TrafficIQ is a simulation-first, production-architected intelligent traffic signal control platform. It replaces traditional fixed-time cycles with a dynamic, speed-and-density-aware timing engine, achieving up to a **40% reduction in average vehicle wait time**.
-
----
-
-## 📌 Features
-
-| Category | Capability | Description |
-|---|---|---|
-| ⏱️ **Adaptive Control** | **Speed-Aware Timing** | Green light durations are calculated dynamically based on real-time vehicle counts and lane speeds. |
-| 🚨 **Emergency Priority** | **Override Queue** | Detects emergency vehicles (CCTV/mock) and preempts signals safely at the next cycle boundary. |
-| 🤖 **Predictive ML** | **Multi-Horizon Forecast** | A deep learning GRU model anticipates congestion trends and adjusts timings proactively. |
-| 🛡️ **Anomaly Detection** | **YOLOv11 Vision Logs** | Monitors road safety, flagging overspeeding, wrong-way driving, red-light runs, and breakdowns. |
-| 🌗 **Premium UI/UX** | **Traffic Lights Theme** | Built with a vibrant Red-Orange-Green palette and a toggle between pure black and white backgrounds. |
+![Status](https://img.shields.io/badge/status-active-success)
+![Python](https://img.shields.io/badge/backend-Python%20%7C%20FastAPI-blue)
+![React](https://img.shields.io/badge/frontend-React-61DAFB)
+![YOLOv11](https://img.shields.io/badge/vision-YOLOv11-orange)
 
 ---
 
-## 🏗️ System Architecture
+## Overview
 
-The platform operates on a **three-layer control architecture** that decouples safety rules from advisory AI optimization:
+TrafficIQ Hub simulates a city-scale smart traffic control platform. It monitors multiple intersections in real time, detects vehicles, pedestrians, and incidents through computer vision, forecasts congestion using a machine learning model, and lets operators manage the system through both a visual dashboard and a natural-language voice assistant.
 
+The goal of the project is to explore how computer vision, forecasting models, and conversational AI can come together in a single operational tool — the kind of system a smart-city traffic control room might use.
+
+## Features
+
+### Live Multi-Junction Control
+- Real-time dashboard monitoring **6 intersections** simultaneously, each with independent lane-level status (blocked / congested / clear)
+- Interactive city map showing signal state and live vehicle counts per junction
+- Manual signal cycling plus an **Emergency Override** mode for priority corridors
+
+### Computer Vision Detection
+- **YOLOv11**-based detection pipeline for vehicles, pedestrians, and traffic incidents from camera feeds
+- Supports multiple camera source types: video file, webcam, RTSP stream, and IP camera
+- Vehicle classification (cars, buses, motorcycles, ambulances, etc.) with live confidence scores
+
+### Forecasting & Analytics
+- **GRU-based** traffic forecasting model to predict short-term congestion trends and recommend signal-timing adjustments
+- Fixed-cycle vs. adaptive-control comparison (wait time, queue length, throughput)
+- Peak-hour analysis, 24-hour traffic heatmap, and junction-to-junction comparison tables
+- Exportable analytics reports in **PDF, CSV, and Excel** formats (hourly / daily / weekly / monthly)
+
+### Incident Detection & Response
+- Automatic detection of collisions, pedestrians on active lanes, and vehicle breakdowns
+- Live incident timeline with severity levels (High / Critical) and alert notifications
+- Behavioral density and congestion analytics per lane
+
+### Voice-Controlled AI Assistant
+- Conversational assistant ("TrafficIQ AI") that answers natural-language questions such as *"Which junction is busiest?"* or *"Any accidents?"*
+- Can surface traffic status, busiest junctions, and active incidents on request
+- Voice input/output support alongside text chat
+
+### Access Control & Security
+- Role-based system access (Admin / Operator / Guest) with per-capability permissions (scenario override, camera management, emergency corridor control, telemetry monitoring)
+- Session authentication with operator ID and verification key
+- Live system telemetry feed (cache status, model load, detection pipeline initialization, security shield status)
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Backend | Python, FastAPI |
+| Frontend | React |
+| Computer Vision | YOLOv11 |
+| Forecasting | GRU (Gated Recurrent Unit) model |
+| Caching | Redis |
+| Real-time updates | WebSockets |
+
+## Screenshots
+
+> Add dashboard screenshots here (`/assets` or `/docs/screenshots`) — e.g. the live control map, junction detail view, incident timeline, and the AI assistant panel.
+
+## Getting Started
+
+```bash
+# Clone the repository
+git clone https://github.com/Kocherlasuhith12/trafficIQ-management-system.git
+cd trafficIQ-management-system
+
+# Backend setup
+cd backend
+pip install -r requirements.txt
+uvicorn main:app --reload
+
+# Frontend setup
+cd ../frontend
+npm install
+npm run dev
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│  Layer 1 — Rule-Based Control (Deterministic & Always Active)    │
-│  Green Duration = f(Vehicle Count, Average Speed)                │
-├──────────────────────────────────────────────────────────────────┤
-│  Layer 2 — ML Optimization (Advisory Trend Forecasting)          │
-│  Deep GRU models predict future queue sizes & adjust durations.  │
-├──────────────────────────────────────────────────────────────────┤
-│  Layer 3 — Emergency Override (Immediate Preemption Queue)        │
-│  Safely locks lanes to green during active emergency transits.  │
-└──────────────────────────────────────────────────────────────────┘
-```
 
----
+> Update the commands above to match your actual folder structure and entry-point filenames.
 
-## 🛠️ Technology Stack
+## Roadmap
 
-*   **Frontend**: React (18.x) · Vite · TypeScript · Tailwind CSS · shadcn/ui · Lucide Icons
-*   **Backend**: FastAPI · Uvicorn · PyTorch (Deep GRU) · scikit-learn · NumPy (fallback helper)
-*   **Infrastructure**: PostgreSQL (relational logs) · Redis (caching and WebSocket pub/sub)
+- [ ] Integrate real CCTV/RTSP feeds in place of simulated streams
+- [ ] Expand incident detection to more anomaly types
+- [ ] Add authentication persistence and multi-operator session handling
+- [ ] Deploy to a cloud environment for public demo access
 
----
+## Author
 
-## 🚀 Running the Project Locally
-
-### Prerequisites
-*   Node.js (version ≥ 18.x)
-*   Python (version ≥ 3.10)
-*   Docker (for local Postgres & Redis services)
-
-### Step 1: Run Infrastructure
-Ensure you have Postgres running on `localhost:5432` and Redis running on `localhost:6379`. The backend automatically hooks into the database credentials.
-
-### Step 2: Run Backend (FastAPI)
-1. Navigate to the backend directory:
-   ```bash
-   cd backend
-   ```
-2. Activate your virtual environment and start uvicorn:
-   ```bash
-   source venv/bin/activate
-   PYTHONPATH=.. uvicorn app.main:app --host 0.0.0.0 --port 8000
-   ```
-   *The API root will be available at `http://localhost:8000` and Swagger documentation at `http://localhost:8000/docs`.*
-
-### Step 3: Run Frontend (Vite)
-1. From the project root, start the development server on a free port (e.g., `5175`):
-   ```bash
-   npm run dev -- --port 5175
-   ```
-2. Open your browser and navigate to `http://localhost:5175`.
-
----
-
-## ☁️ Deploying to a Public Server (Free)
-
-Here is how you can host the entire system for free:
-
-### 1. Database & Cache Providers
-*   **PostgreSQL**: Host a lifetime-free serverless database at [Neon.tech](https://neon.tech/) and copy the URI.
-*   **Redis**: Create a free serverless Redis instance on [Upstash Redis](https://upstash.com/) and copy the URI.
-
-### 2. Backend Web Service (Render)
-1. Link your GitHub repository to [Render](https://render.com/).
-2. Create a new **Web Service** with the root directory set to `backend`.
-3. Set the build and start commands:
-   *   **Build**: `pip install -r requirements.txt`
-   *   **Start**: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-4. Add environment variables:
-   *   `DATABASE_URL`: *(Your Neon connection string)*
-   *   `REDIS_URL`: *(Your Upstash Redis connection string)*
-   *   `PYTHONPATH`: `/opt/render/project/src/backend`
-
-### 3. Frontend Static Site (Render)
-1. Create a **Static Site** on Render linked to your repository.
-2. Leave the root directory as `./`.
-3. Set build commands:
-   *   **Build**: `npm install --legacy-peer-deps && npm run build`
-   *   **Publish directory**: `dist`
-4. Add the environment variable `VITE_BACKEND_URL` pointing to your backend Render URL.
+**KKS Suhith Babu**
+[Portfolio](https://kocherlasuhith12.github.io/portfolio-website/) · [GitHub](https://github.com/Kocherlasuhith12) · [LinkedIn](https://www.linkedin.com/in/kocherlakoteswarasuhithsravanbabu/)
