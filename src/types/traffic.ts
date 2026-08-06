@@ -111,3 +111,11 @@ export interface EmergencyOverrideLog {
   durationMs: number;
   resolved: boolean;
 }
+
+export interface CameraSource {
+  id: string;
+  name: string;
+  type: string; // 'webcam' | 'rtsp' | 'ip' | 'cctv' | 'file'
+  source: string;
+  is_active: boolean;
+}

@@ -197,7 +197,19 @@ class CameraManager:
             "is_active": False
         }
 
+    @staticmethod
+    def normalize_id(cam_id: str) -> str:
+        import re
+        if not cam_id:
+            return cam_id
+        match = re.search(r'\d+', cam_id)
+        if match:
+            num = int(match.group(0))
+            return f"cam-{num}"
+        return cam_id
+
     def delete_camera(self, cam_id: str):
+        cam_id = self.normalize_id(cam_id)
         if cam_id in self.runners:
             self.stop_camera(cam_id)
         if cam_id in self.cameras:
@@ -205,6 +217,7 @@ class CameraManager:
             logger.info(f"Deleted camera source: {cam_id}")
 
     def start_camera(self, cam_id: str) -> bool:
+        cam_id = self.normalize_id(cam_id)
         if cam_id not in self.cameras:
             return False
         if cam_id in self.runners:
@@ -224,6 +237,7 @@ class CameraManager:
         return True
 
     def stop_camera(self, cam_id: str) -> bool:
+        cam_id = self.normalize_id(cam_id)
         if cam_id not in self.runners:
             return False
         runner = self.runners[cam_id]
@@ -234,6 +248,7 @@ class CameraManager:
         return True
 
     def get_runner(self, cam_id: str) -> Optional[CameraRunner]:
+        cam_id = self.normalize_id(cam_id)
         return self.runners.get(cam_id)
 
 camera_manager = CameraManager()

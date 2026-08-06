@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { API_BASE_URL } from '@/config';
 import { AnomalyRecord } from '@/data/trafficDetectionDataset';
 
 // ── Extend AnomalyRecord with Phase 3 fields ──────────────────────────────────
@@ -87,7 +88,7 @@ const IncidentTimeline: React.FC<IncidentTimelineProps> = ({ anomalies, onResolv
   const handleResolve = useCallback(async (incident: IncidentRecord) => {
     setResolving(incident.id);
     try {
-      await fetch(`/api/v1/incidents/${incident.id}/resolve`, { method: 'POST' });
+      await fetch(`${API_BASE_URL}/api/v1/incidents/${incident.id}/resolve`, { method: 'POST' });
       onResolve?.(incident.id);
     } catch (e) {
       console.error('Resolve failed:', e);
@@ -211,7 +212,7 @@ interface ModalProps {
 
 const IncidentModal: React.FC<ModalProps> = ({ incident, resolving, onResolve, onClose }) => {
   const meta = INCIDENT_META[incident.type] || DEFAULT_META;
-  const screenshotUrl = `http://localhost:8000/api/v1/incidents/screenshot/${incident.id}`;
+  const screenshotUrl = `${API_BASE_URL}/api/v1/incidents/screenshot/${incident.id}`;
   const [imgError, setImgError] = useState(false);
 
   return (

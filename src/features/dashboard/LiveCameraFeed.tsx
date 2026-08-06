@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, MouseEvent } from 'react';
+import { API_BASE_URL } from '@/config';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -480,7 +481,7 @@ const LiveCameraFeed: React.FC<LiveCameraFeedProps> = ({
         {activeCameraId && !isStopped && (
           <img
             ref={imgRef}
-            src={`http://localhost:8000/api/v1/cameras/${activeCameraId}/stream`}
+            src={`${API_BASE_URL}/api/v1/cameras/${activeCameraId}/stream`}
             alt="Live YOLO Detection"
             style={{
               transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,

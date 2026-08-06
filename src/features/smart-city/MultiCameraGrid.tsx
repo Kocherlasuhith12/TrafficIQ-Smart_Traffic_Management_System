@@ -3,6 +3,13 @@
  * 100+ camera support: grid view with status dots, active highlight, grid size selector.
  */
 import React, { useState } from 'react';
+import { API_BASE_URL } from '@/config';
+
+const normalizeCamId = (id: string | null | undefined): string => {
+  if (!id) return '';
+  const num = id.match(/\d+/)?.[0];
+  return num ? `cam-${parseInt(num, 10)}` : id;
+};
 
 interface Camera {
   id: string;
@@ -52,7 +59,7 @@ const STATUS_LABELS: Record<Camera['status'], string> = {
   live: 'LIVE', recording: 'REC', offline: 'OFF',
 };
 
-const MultiCameraGrid: React.FC<MultiCameraGridProps> = ({ activeCameraId, streamBaseUrl = 'http://localhost:8000' }) => {
+const MultiCameraGrid: React.FC<MultiCameraGridProps> = ({ activeCameraId, streamBaseUrl = API_BASE_URL }) => {
   const [gridSize, setGridSize] = useState<GridSize>('3x3');
   const [filter, setFilter] = useState<'all' | 'live' | 'offline'>('all');
   const [selectedCam, setSelectedCam] = useState<Camera | null>(null);
@@ -133,7 +140,7 @@ const MultiCameraGrid: React.FC<MultiCameraGridProps> = ({ activeCameraId, strea
         style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
       >
         {pageCams.map(cam => {
-          const isActive = cam.id === activeCameraId;
+          const isActive = normalizeCamId(cam.id) === normalizeCamId(activeCameraId);
           const isSelected = selectedCam?.id === cam.id;
           return (
             <button

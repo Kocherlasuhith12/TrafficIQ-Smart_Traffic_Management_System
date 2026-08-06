@@ -3,7 +3,8 @@
 // stream updates and fallback client-side simulation when backend is offline.
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Intersection, TrafficMetrics, MLPrediction, HistoricalDataPoint, JunctionSummary, TrafficFlowMetrics, EmergencyOverrideLog } from '@/types/traffic';
+import { API_BASE_URL } from '@/config';
+import { Intersection, TrafficMetrics, MLPrediction, HistoricalDataPoint, JunctionSummary, TrafficFlowMetrics, EmergencyOverrideLog, CameraSource } from '@/types/traffic';
 import { SignalController } from '@/features/signal-control/SignalController';
 import { createDefaultIntersections, generateHistoricalData } from '@/data/mockTrafficData';
 import { createAllControllers } from '@/services/signalService';
@@ -48,6 +49,7 @@ export interface SimulationState {
     cpuUsage: number;
     gpuUsage: number;
   };
+  cameras: CameraSource[];
 }
 
 export const useTrafficSimulation = () => {
@@ -104,6 +106,7 @@ export const useTrafficSimulation = () => {
         cpuUsage: 0,
         gpuUsage: 0,
       },
+      cameras: [],
     };
   });
 
@@ -132,6 +135,35 @@ export const useTrafficSimulation = () => {
   // Initialize local controllers for fallback mode
   useEffect(() => {
     controllerRef.current = createAllControllers();
+  }, []);
+
+  // Poll cameras from the backend or fall back to mock data if offline
+  useEffect(() => {
+    const fetchCameras = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/v1/cameras`);
+        if (res.ok) {
+          const data = await res.json();
+          setState(prev => ({ ...prev, cameras: data }));
+        } else {
+          throw new Error('Not OK');
+        }
+      } catch (err) {
+        // Fallback mock camera list
+        setState(prev => ({
+          ...prev,
+          cameras: prev.cameras.length > 0 ? prev.cameras : [
+            { id: 'camera-1', name: 'Junction 1 - Main North', type: 'cctv', source: 'cctv_n_01', is_active: true },
+            { id: 'camera-2', name: 'Junction 1 - Main South', type: 'cctv', source: 'cctv_s_01', is_active: true },
+            { id: 'camera-3', name: 'Junction 1 - Main East', type: 'cctv', source: 'cctv_e_01', is_active: false },
+            { id: 'camera-4', name: 'Junction 1 - Main West', type: 'cctv', source: 'cctv_w_01', is_active: false }
+          ]
+        }));
+      }
+    };
+    fetchCameras();
+    const interval = setInterval(fetchCameras, 4000);
+    return () => clearInterval(interval);
   }, []);
 
   // Fallback Local Simulation Loop (runs ONLY when WebSocket is disconnected or silent)

@@ -1,5 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '@/config';
 import { Card } from '@/components/ui/card';
+
+const normalizeCamId = (id: string | null | undefined): string => {
+  if (!id) return '';
+  const num = id.match(/\d+/)?.[0];
+  return num ? `cam-${parseInt(num, 10)}` : id;
+};
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -36,7 +43,7 @@ const CameraManager: React.FC<CameraManagerProps> = ({ activeCameraId, onActiveC
   const fetchCameras = async () => {
     try {
       setLoading(true);
-      const res = await fetch('http://localhost:8000/api/v1/cameras');
+      const res = await fetch(`${API_BASE_URL}/api/v1/cameras`);
       if (!res.ok) throw new Error('Failed to fetch cameras');
       const data = await res.json();
       setCameras(data);
@@ -57,7 +64,7 @@ const CameraManager: React.FC<CameraManagerProps> = ({ activeCameraId, onActiveC
   // Handle active change
   const handleSetActive = async (camId: string) => {
     try {
-      const res = await fetch(`http://localhost:8000/api/v1/cameras/${camId}/active`, {
+      const res = await fetch(`${API_BASE_URL}/api/v1/cameras/${camId}/active`, {
         method: 'POST',
       });
       if (!res.ok) throw new Error('Failed to set active camera');
@@ -72,7 +79,7 @@ const CameraManager: React.FC<CameraManagerProps> = ({ activeCameraId, onActiveC
   const handleToggleRunning = async (cam: CameraSource) => {
     const action = cam.is_active ? 'stop' : 'start';
     try {
-      const res = await fetch(`http://localhost:8000/api/v1/cameras/${cam.id}/${action}`, {
+      const res = await fetch(`${API_BASE_URL}/api/v1/cameras/${cam.id}/${action}`, {
         method: 'POST',
       });
       if (!res.ok) throw new Error(`Failed to ${action} camera`);
@@ -86,7 +93,7 @@ const CameraManager: React.FC<CameraManagerProps> = ({ activeCameraId, onActiveC
   const handleDelete = async (camId: string) => {
     if (!confirm('Are you sure you want to delete this camera source?')) return;
     try {
-      const res = await fetch(`http://localhost:8000/api/v1/cameras/${camId}`, {
+      const res = await fetch(`${API_BASE_URL}/api/v1/cameras/${camId}`, {
         method: 'DELETE',
       });
       if (!res.ok) throw new Error('Failed to delete camera');
@@ -102,7 +109,7 @@ const CameraManager: React.FC<CameraManagerProps> = ({ activeCameraId, onActiveC
     const formData = new FormData();
     formData.append('file', file);
     try {
-      const res = await fetch('http://localhost:8000/api/v1/cameras/upload', {
+      const res = await fetch(`${API_BASE_URL}/api/v1/cameras/upload`, {
         method: 'POST',
         body: formData,
       });
@@ -128,7 +135,7 @@ const CameraManager: React.FC<CameraManagerProps> = ({ activeCameraId, onActiveC
         finalSource = await handleFileUpload(selectedFile);
       }
 
-      const res = await fetch('http://localhost:8000/api/v1/cameras', {
+      const res = await fetch(`${API_BASE_URL}/api/v1/cameras`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, type, source: finalSource }),
@@ -241,7 +248,7 @@ const CameraManager: React.FC<CameraManagerProps> = ({ activeCameraId, onActiveC
 
       <div className="flex flex-col gap-2 max-h-[220px] overflow-y-auto pr-1">
         {cameras.map(cam => {
-          const isActiveFeed = activeCameraId === cam.id;
+          const isActiveFeed = normalizeCamId(activeCameraId) === normalizeCamId(cam.id);
           return (
             <div 
               key={cam.id} 

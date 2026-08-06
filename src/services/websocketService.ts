@@ -1,3 +1,5 @@
+import { WS_BASE_URL } from '@/config';
+
 export type WebSocketCallback = (data: any) => void;
 
 class WebSocketService {
@@ -10,9 +12,7 @@ class WebSocketService {
   private messageQueue: string[] = [];
 
   constructor() {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = import.meta.env.DEV ? 'localhost:8000' : window.location.host;
-    this.url = `${protocol}//${host}/api/v1/ws/traffic`;
+    this.url = `${WS_BASE_URL}/api/v1/ws/traffic`;
   }
 
   connect(): void {

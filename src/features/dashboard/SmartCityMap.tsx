@@ -1,5 +1,11 @@
 import React from 'react';
 import { Intersection, JunctionSummary } from '@/types/traffic';
+
+const normalizeCamId = (id: string | null | undefined): string => {
+  if (!id) return '';
+  const num = id.match(/\d+/)?.[0];
+  return num ? `cam-${parseInt(num, 10)}` : id;
+};
 import { Card } from '@/components/ui/card';
 
 interface SmartCityMapProps {
@@ -133,7 +139,7 @@ const SmartCityMap: React.FC<SmartCityMapProps> = ({
           const heatColor = getJunctionColor(congestionLevel);
           const totalVehicles = summary?.totalVehicles || 0;
 
-          const isCameraActive = activeCameraId === mj.camId;
+          const isCameraActive = normalizeCamId(activeCameraId) === normalizeCamId(mj.camId);
 
           return (
             <g key={mj.id} className="transition-all duration-300">

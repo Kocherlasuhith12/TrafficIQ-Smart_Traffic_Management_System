@@ -1,28 +1,23 @@
-import { useState } from 'react';
-import Dashboard from '@/features/dashboard/Dashboard';
+import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Login, { User } from '@/features/auth/Login';
 
 const Index = () => {
-  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+  const navigate = useNavigate();
+
+  useEffect(() => {
     const saved = localStorage.getItem('traffic_currentUser');
-    return saved ? JSON.parse(saved) : null;
-  });
+    if (saved) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [navigate]);
 
   const handleLoginSuccess = (user: User) => {
-    setCurrentUser(user);
     localStorage.setItem('traffic_currentUser', JSON.stringify(user));
+    navigate('/dashboard', { replace: true });
   };
 
-  const handleLogout = () => {
-    setCurrentUser(null);
-    localStorage.removeItem('traffic_currentUser');
-  };
-
-  if (!currentUser) {
-    return <Login onLoginSuccess={handleLoginSuccess} />;
-  }
-
-  return <Dashboard user={currentUser} onLogout={handleLogout} />;
+  return <Login onLoginSuccess={handleLoginSuccess} />;
 };
 
 export default Index;

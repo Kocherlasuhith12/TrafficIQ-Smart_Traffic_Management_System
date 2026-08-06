@@ -200,6 +200,7 @@ def stop_camera(cam_id: str):
 def set_active_camera(cam_id: str):
     """Set the camera source to feed real counts into the main simulation."""
     from backend.app.services.camera_manager import camera_manager
+    cam_id = camera_manager.normalize_id(cam_id)
     if cam_id not in camera_manager.cameras:
         raise HTTPException(status_code=404, detail=f"Camera {cam_id} not found")
     simulation_manager.active_camera_id = cam_id

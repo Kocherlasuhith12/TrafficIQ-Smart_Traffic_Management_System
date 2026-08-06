@@ -44,6 +44,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [regRole, setRegRole] = useState<UserRole>('operator');
+  const [loginRole, setLoginRole] = useState<UserRole>('operator');
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   
@@ -89,7 +90,12 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     const matched = db[normalizedUser];
 
     if (matched && matched.passwordHash === normalizedPass) {
-      onLoginSuccess({ username: matched.displayName, role: matched.role });
+      if (matched.role !== loginRole) {
+        setError(`Access denied. Role mismatch: '${normalizedUser}' is registered as ${matched.role.toUpperCase()}, not ${loginRole.toUpperCase()}.`);
+        setSuccessMsg(null);
+      } else {
+        onLoginSuccess({ username: matched.displayName, role: matched.role });
+      }
     } else {
       setError('Invalid operator credentials.');
       setSuccessMsg(null);
@@ -124,15 +130,6 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     setUsername('');
     setPassword('');
     setDisplayName('');
-  };
-
-  const handleQuickLogin = (role: UserRole) => {
-    const names: Record<UserRole, string> = {
-      admin: 'Administrator',
-      operator: 'Control Operator',
-      guest: 'Guest Monitor',
-    };
-    onLoginSuccess({ username: names[role], role });
   };
 
   return (
@@ -282,16 +279,73 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                 </div>
               )}
 
-              {/* Forms */}
               {!isRegistering ? (
                 <form onSubmit={handleLogin} className="flex flex-col gap-4">
+                  {/* Role Selector inside form */}
                   <div className="flex flex-col gap-1.5">
                     <label className="text-[9px] font-bold text-[#A1A1AA] uppercase tracking-widest font-mono">
-                      Operator ID
+                      System Access Role
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLoginRole('admin');
+                          setError(null);
+                        }}
+                        className={`h-9 text-[9px] font-mono font-bold rounded-lg border transition-all flex flex-col justify-center items-center gap-0.5 ${
+                          loginRole === 'admin'
+                            ? 'border-red-500/80 bg-red-500/10 text-red-400 shadow-[0_0_10px_rgba(239,68,68,0.2)]'
+                            : 'border-red-500/20 bg-red-500/5 hover:bg-red-500/10 text-red-500/70 hover:text-red-500'
+                        }`}
+                      >
+                        <span>👑</span>
+                        <span>ADMIN</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLoginRole('operator');
+                          setError(null);
+                        }}
+                        className={`h-9 text-[9px] font-mono font-bold rounded-lg border transition-all flex flex-col justify-center items-center gap-0.5 ${
+                          loginRole === 'operator'
+                            ? 'border-blue-500/80 bg-blue-500/10 text-blue-400 shadow-[0_0_10px_rgba(59,130,246,0.2)]'
+                            : 'border-blue-500/20 bg-blue-500/5 hover:bg-blue-500/10 text-blue-500/70 hover:text-blue-500'
+                        }`}
+                      >
+                        <span>👷</span>
+                        <span>OPERATOR</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLoginRole('guest');
+                          setError(null);
+                        }}
+                        className={`h-9 text-[9px] font-mono font-bold rounded-lg border transition-all flex flex-col justify-center items-center gap-0.5 ${
+                          loginRole === 'guest'
+                            ? 'border-zinc-500/80 bg-zinc-500/15 text-zinc-300 shadow-[0_0_10px_rgba(161,161,170,0.2)]'
+                            : 'border-zinc-500/20 bg-zinc-500/5 hover:bg-zinc-500/10 text-zinc-400/70 hover:text-zinc-400'
+                        }`}
+                      >
+                        <span>👁️</span>
+                        <span>GUEST</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[9px] font-bold text-[#A1A1AA] uppercase tracking-widest font-mono">
+                      {loginRole === 'admin' ? 'Administrator ID' : loginRole === 'operator' ? 'Operator ID' : 'Guest ID'}
                     </label>
                     <Input
                       required
-                      placeholder="Enter Operator Username"
+                      placeholder={
+                        loginRole === 'admin' ? 'Enter admin username (e.g. admin)' :
+                        loginRole === 'operator' ? 'Enter operator username (e.g. operator)' :
+                        'Enter guest username (e.g. guest)'
+                      }
                       value={username}
                       onChange={e => setUsername(e.target.value)}
                       className="h-10 text-xs bg-[#0b0d13]/70 border-[#27272A] hover:border-[#f97316]/50 focus:border-[#f97316] text-[#F8FAFC] transition-all font-mono"
@@ -384,39 +438,6 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                   </Button>
                 </form>
               )}
-
-              {/* Demo quick logins widgets (Tesla Grid) */}
-              <div className="flex flex-col gap-2.5 pt-4 border-t border-[#27272A]/80">
-                <p className="text-[8px] text-[#A1A1AA] font-mono text-center uppercase tracking-widest">
-                  Quick Access Simulation Presets
-                </p>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleQuickLogin('admin')}
-                    className="h-8 text-[9px] font-mono font-bold rounded-lg border border-red-500/20 hover:border-red-500/60 bg-red-500/5 hover:bg-red-500/10 text-red-500 transition-all flex flex-col justify-center items-center gap-0.5"
-                  >
-                    <span>👑</span>
-                    <span>ADMIN</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleQuickLogin('operator')}
-                    className="h-8 text-[9px] font-mono font-bold rounded-lg border border-blue-500/20 hover:border-blue-500/60 bg-blue-500/5 hover:bg-blue-500/10 text-blue-500 transition-all flex flex-col justify-center items-center gap-0.5"
-                  >
-                    <span>👷</span>
-                    <span>OPERATOR</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleQuickLogin('guest')}
-                    className="h-8 text-[9px] font-mono font-bold rounded-lg border border-zinc-500/20 hover:border-zinc-500/60 bg-zinc-500/5 hover:bg-zinc-500/10 text-zinc-400 transition-all flex flex-col justify-center items-center gap-0.5"
-                  >
-                    <span>👁️</span>
-                    <span>GUEST</span>
-                  </button>
-                </div>
-              </div>
             </Card>
 
             {/* Access control details */}

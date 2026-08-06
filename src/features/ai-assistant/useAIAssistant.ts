@@ -131,7 +131,11 @@ export function useAIAssistant(
 
     // Generate AI response
     setTimeout(() => {
-      const aiResp = generateAIResponse(text, simState);
+      const savedUser = localStorage.getItem('traffic_currentUser');
+      const user = savedUser ? JSON.parse(savedUser) : null;
+      const userRole = user ? user.role : 'guest';
+
+      const aiResp = generateAIResponse(text, simState, userRole);
 
       const assistantMsg: ChatMessage = {
         id: `ai-${Date.now()}`,

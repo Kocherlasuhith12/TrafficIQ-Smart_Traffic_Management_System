@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { API_BASE_URL } from '@/config';
 import { useTrafficSimulation } from '@/hooks/useTrafficSimulation';
 import KpiCards from './KpiCards';
 import TrafficMap from './TrafficMap';
@@ -222,7 +223,7 @@ const Dashboard = ({ user, onLogout }: DashboardProps) => {
                   const finalCamId = `camera-${numericId}`;
                   sim.setActiveCameraId?.(finalCamId);
                   setMapMode(false); // Auto switch to feed view when camera is selected
-                  fetch(`http://localhost:8000/api/v1/cameras/${finalCamId}/active`, { method: 'POST' }).catch(() => {});
+                  fetch(`${API_BASE_URL}/api/v1/cameras/${finalCamId}/active`, { method: 'POST' }).catch(() => {});
                 }}
                 emergencyActive={sim.emergencyActive}
                 emergencyLane={sim.emergencyLane}
