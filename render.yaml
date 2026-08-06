@@ -20,8 +20,9 @@ services:
           property: connectionString
 
   # React Static Frontend
-  - type: static
+  - type: web
     name: trafficiq-frontend
+    runtime: static
     plan: free
     buildCommand: npm run build
     staticPublishPath: dist
