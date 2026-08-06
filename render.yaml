@@ -28,15 +28,13 @@ services:
     staticPublishPath: dist
     envVars:
       - key: VITE_API_URL
-        fromService:
-          type: web
-          name: trafficiq-backend
-          property: url
+        sync: false
 
   # Redis Cache (KeyValue store)
   - type: keyvalue
     name: trafficiq-redis
     plan: free
+    ipAllowList: []
 
 # PostgreSQL Database
 databases:
