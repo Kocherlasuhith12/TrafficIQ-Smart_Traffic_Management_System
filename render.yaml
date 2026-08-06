@@ -2,9 +2,9 @@ services:
   # Python FastAPI Backend Web Service
   - type: web
     name: trafficiq-backend
-    env: docker
+    runtime: docker
     dockerContext: backend
-    dockerfilePath: Dockerfile
+    dockerfilePath: backend/Dockerfile
     plan: free
     envVars:
       - key: YOLO_MODEL_PATH
