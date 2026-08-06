@@ -1,0 +1,44 @@
+services:
+  # Python FastAPI Backend Web Service
+  - type: web
+    name: trafficiq-backend
+    env: docker
+    dockerContext: backend
+    dockerfilePath: Dockerfile
+    plan: free
+    envVars:
+      - key: YOLO_MODEL_PATH
+        value: yolo11n.pt
+      - key: DATABASE_URL
+        fromDatabase:
+          name: trafficiq-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: trafficiq-redis
+          property: connectionString
+
+  # React static frontend
+  - type: web
+    name: trafficiq-frontend
+    env: static
+    plan: free
+    buildCommand: npm run build
+    publishDir: dist
+    envVars:
+      - key: VITE_API_URL
+        fromService:
+          type: web
+          name: trafficiq-backend
+          property: url
+
+# PostgreSQL Database
+databases:
+  - name: trafficiq-db
+    plan: free
+
+# Redis Cache
+redis:
+  - name: trafficiq-redis
+    plan: free
